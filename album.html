@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>摄影作品集</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Google手写体字体 -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap">
+    <style>
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            letter-spacing: 0.02em;
+        }
+        .thumbnail {
+            opacity: 0.6;
+            transition: all 0.3s ease;
+            position: relative;
+            width: 80px;
+            height: 80px;
+            margin: 0 8px;
+        }
+        .thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .thumbnail.active::after, .thumbnail:hover::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 15px;
+            height: 1px;
+            background-color: #000;
+        }
+        .thumbnail.active, .thumbnail:hover {
+            opacity: 1;
+        }
+        .main-image-container {
+            height: 70vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .main-image {
+            max-height: 100%;
+            max-width: 100%;
+            object-fit: contain;
+            transition: opacity 0.8s ease;
+        }
+        .main-image.fade {
+            opacity: 0;
+        }
+        .fade-in {
+            animation: fadeIn 0.8s ease-in-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .nav-link {
+            position: relative;
+        }
+        .nav-link.active::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 20px;
+            height: 1px;
+            background-color: #000;
+        }
+        .signature {
+            font-family: 'Caveat', cursive;
+            font-weight: 400;
+            color: #666;
+        }
+        /* 加载占位符动画 */
+        .loading-placeholder {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: 200% 0;
+            }
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        /* 图片淡入动画 */
+        .fade-in {
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        .fade-in.loaded {
+            opacity: 1;
+        }
+
+        /* 灯箱样式 */
+        .lightbox {
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        .lightbox.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .lightbox img {
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .lightbox img:hover {
+            transform: scale(1.02);
+        }
+
+        /* 导航按钮样式 */
+        .nav-button {
+            transition: all 0.2s ease-in-out;
+        }
+
+        .nav-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .nav-button:not(:disabled):hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* 图片容器样式 */
+        .image-container {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+
+        .image-container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+    </style>
+</head>
+<body class="bg-white min-h-screen">
+    <nav class="fixed top-0 left-0 right-0 bg-white bg-opacity-90 backdrop-blur-sm z-50 border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="text-gray-900 hover:text-gray-600">
+                        首页
+                    </a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span id="album-location" class="text-gray-600"></span>
+                    <span class="text-gray-300">|</span>
+                    <span id="album-date" class="text-gray-600"></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-12">
+        <div class="text-center mb-8">
+            <h1 id="album-title" class="text-3xl font-light text-gray-900"></h1>
+        </div>
+
+        <div class="flex flex-col items-center space-y-8">
+            <div class="main-image-container w-full">
+                <img id="main-image" class="main-image rounded-lg shadow-lg" src="" alt="">
+            </div>
+
+            <div class="w-full overflow-x-auto py-4">
+                <div id="thumbnails" class="flex justify-center min-w-max px-4">
+                    <!-- 缩略图将通过 JavaScript 动态添加 -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 图片配置
+        const imageConfig = {
+            ossDomain: 'http://xingyan-photo.oss-cn-hangzhou.aliyuncs.com',
+            thumbnailParams: '?x-oss-process=image/resize,w_400,h_400,m_fill/quality,q_80',
+            fullImageParams: '?x-oss-process=image/resize,w_1920,m_lfit/quality,q_90',
+            previewParams: '?x-oss-process=image/resize,w_800,m_lfit/quality,q_85'
+        };
+
+        // API 基础URL
+        const API_BASE_URL = 'http://localhost:3000/api';
+        
+        // 获取URL参数
+        function getUrlParam(param) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(param);
+        }
+
+        // 预加载队列
+        const preloadQueue = [];
+        let isPreloading = false;
+
+        // 添加到预加载队列
+        function addToPreloadQueue(url) {
+            if (!preloadQueue.includes(url)) {
+                preloadQueue.push(url);
+                startPreloading();
+            }
+        }
+
+        // 开始预加载
+        async function startPreloading() {
+            if (isPreloading || preloadQueue.length === 0) return;
+            
+            isPreloading = true;
+            while (preloadQueue.length > 0) {
+                const url = preloadQueue.shift();
+                try {
+                    await preloadImage(url);
+                } catch (error) {
+                    console.error('预加载图片失败:', error);
+                }
+            }
+            isPreloading = false;
+        }
+
+        // 预加载图片
+        function preloadImage(url) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = url;
+            });
+        }
+
+        // 获取并显示专辑内容
+        async function fetchAndDisplayAlbum() {
+            const albumId = getUrlParam('id');
+            if (!albumId) {
+                console.error('没有指定专辑ID');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/albums/${albumId}`);
+                if (!response.ok) throw new Error('Failed to fetch album details');
+                
+                const album = await response.json();
+                displayAlbum(album);
+            } catch (error) {
+                console.error('Error fetching album details:', error);
+            }
+        }
+
+        // 显示专辑内容
+        function displayAlbum(album) {
+            document.getElementById('album-title').textContent = album.title;
+            document.title = `${album.title} - 摄影作品集`;
+            
+            if (album.location) {
+                document.getElementById('album-location').textContent = album.location;
+            }
+            
+            if (album.date) {
+                const date = new Date(album.date);
+                const formattedDate = date.toLocaleDateString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                }).replace(/\//g, '-');
+                document.getElementById('album-date').textContent = formattedDate;
+            }
+            
+            // 设置主图
+            const mainImage = document.getElementById('main-image');
+            if (album.images.length > 0) {
+                const previewUrl = album.images[0].src + imageConfig.previewParams;
+                mainImage.src = previewUrl;
+                mainImage.alt = album.images[0].alt;
+                
+                // 预加载第一张全尺寸图片
+                addToPreloadQueue(album.images[0].src + imageConfig.fullImageParams);
+            }
+            
+            // 生成缩略图
+            const thumbnailsContainer = document.getElementById('thumbnails');
+            thumbnailsContainer.innerHTML = '';
+            
+            // 创建 Intersection Observer
+            const imageObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        const thumbnailUrl = img.dataset.src;
+                        if (thumbnailUrl) {
+                            img.src = thumbnailUrl;
+                            img.removeAttribute('data-src');
+                            observer.unobserve(img);
+                        }
+                    }
+                });
+            }, {
+                rootMargin: '50px 0px',
+                threshold: 0.1
+            });
+            
+            let currentIndex = 0;
+            let slideshowTimer = null;
+            
+            function startSlideshow() {
+                if (slideshowTimer) clearInterval(slideshowTimer);
+                slideshowTimer = setInterval(() => {
+                    const nextIndex = (currentIndex + 1) % album.images.length;
+                    thumbnailsContainer.children[nextIndex].click();
+                }, 5000);
+            }
+            
+            function resetSlideshowTimer() {
+                if (slideshowTimer) clearInterval(slideshowTimer);
+                startSlideshow();
+            }
+            
+            album.images.forEach((image, index) => {
+                const thumbnailUrl = image.src + imageConfig.thumbnailParams;
+                const fullImageUrl = image.src + imageConfig.fullImageParams;
+                const previewUrl = image.src + imageConfig.previewParams;
+                
+                const thumbnail = document.createElement('div');
+                thumbnail.className = `thumbnail cursor-pointer ${index === 0 ? 'active' : ''}`;
+                thumbnail.innerHTML = `
+                    <div class="loading-placeholder w-full h-full"></div>
+                    <img data-src="${thumbnailUrl}" 
+                         alt="${image.alt}" 
+                         class="fade-in absolute inset-0"
+                         style="display: none;">
+                `;
+                
+                const thumbnailImg = thumbnail.querySelector('img');
+                imageObserver.observe(thumbnailImg);
+                
+                thumbnailImg.onload = () => {
+                    thumbnail.querySelector('.loading-placeholder').remove();
+                    thumbnailImg.style.display = 'block';
+                    thumbnailImg.classList.add('loaded');
+                };
+                
+                thumbnail.addEventListener('click', async () => {
+                    document.querySelectorAll('.thumbnail').forEach(t => t.classList.remove('active'));
+                    thumbnail.classList.add('active');
+                    
+                    mainImage.classList.remove('loaded');
+                    mainImage.classList.add('fade');
+                    
+                    try {
+                        // 先加载预览图
+                        mainImage.src = previewUrl;
+                        await preloadImage(fullImageUrl);
+                        
+                        // 使用 setTimeout 确保过渡动画平滑
+                        setTimeout(() => {
+                            mainImage.src = fullImageUrl;
+                            mainImage.alt = image.alt;
+                            mainImage.classList.remove('fade');
+                            mainImage.classList.add('loaded');
+                        }, 300);
+                        
+                        if (index < album.images.length - 1) {
+                            const nextImage = album.images[index + 1];
+                            addToPreloadQueue(nextImage.src + imageConfig.previewParams);
+                            addToPreloadQueue(nextImage.src + imageConfig.fullImageParams);
+                        }
+                    } catch (error) {
+                        console.error('Error loading image:', error);
+                    }
+                    
+                    currentIndex = index;
+                    resetSlideshowTimer();
+                });
+                
+                thumbnailsContainer.appendChild(thumbnail);
+            });
+            
+            // 键盘导航
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft' && currentIndex > 0) {
+                    thumbnailsContainer.children[currentIndex - 1].click();
+                } else if (e.key === 'ArrowRight' && currentIndex < album.images.length - 1) {
+                    thumbnailsContainer.children[currentIndex + 1].click();
+                }
+            });
+            
+            // 启动自动轮播
+            startSlideshow();
+            
+            // 当用户与页面交互时重置轮播计时器
+            document.addEventListener('mousemove', resetSlideshowTimer);
+            document.addEventListener('keydown', resetSlideshowTimer);
+        }
+
+        // 页面加载完成后获取专辑内容
+        document.addEventListener('DOMContentLoaded', fetchAndDisplayAlbum);
+    </script>
+</body>
+</html>
+
+
