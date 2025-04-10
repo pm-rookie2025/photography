@@ -11,26 +11,29 @@
 - 支持增量更新和强制更新
 - 智能图片压缩和优化
 - 自动生成多种尺寸的图片
-- 支持自动轮播和键盘导航
 - 响应式设计，适配各种设备
 
 ## 版本历史
 
-### v1.1 (2024-03-xx)
+### v1.1 (2024-03-21)
 - 优化图片加载性能
   - 添加预加载队列系统
   - 实现渐进式图片加载
   - 优化缩略图懒加载
 - 改进用户界面
   - 优化图片切换动画
-  - 添加自动轮播功能
-  - 改进键盘导航体验
+  - 改进导航体验
+  - 优化移动端适配
 - 使用阿里云 OSS 存储图片
   - 支持多种图片尺寸
   - 自动图片压缩和优化
   - CDN 加速支持
+- 安全性改进
+  - 移除敏感配置信息
+  - 优化错误处理
+  - 加强参数验证
 
-### v1.0 (2024-03-xx)
+### v1.0 (2024-03-14)
 - 首次发布
 - 基本功能实现
   - 系列和专辑展示
@@ -53,11 +56,13 @@ NOTION_API_KEY=your_notion_api_key
 NOTION_DATABASE_ID=your_notion_database_id
 
 # 阿里云 OSS 配置
-OSS_REGION=oss-cn-hangzhou
+OSS_REGION=your_oss_region
 OSS_ACCESS_KEY_ID=your_access_key_id
 OSS_ACCESS_KEY_SECRET=your_access_key_secret
 OSS_BUCKET=your_bucket_name
 ```
+
+> 注意：请勿将包含实际密钥的 `.env` 文件提交到代码仓库。
 
 ### Notion 数据库结构
 
@@ -70,12 +75,24 @@ OSS_BUCKET=your_bucket_name
 
 ## 安装和使用
 
-1. 安装依赖：
+1. 克隆仓库：
+```bash
+git clone https://github.com/your-username/photography.git
+cd photography
+```
+
+2. 安装依赖：
 ```bash
 npm install
 ```
 
-2. 同步图片：
+3. 配置环境变量：
+```bash
+cp .env.example .env
+# 编辑 .env 文件，填入你的配置信息
+```
+
+4. 同步图片：
 ```bash
 # 增量更新（仅同步新图片）
 npm run sync-images
@@ -84,12 +101,12 @@ npm run sync-images
 FORCE_UPDATE=true npm run sync-images
 ```
 
-3. 启动服务器：
+5. 启动服务器：
 ```bash
 npm start
 ```
 
-4. 访问网站：
+6. 访问网站：
 打开浏览器访问 `http://localhost:3000`
 
 ## 自动化部署
@@ -112,6 +129,23 @@ node cron-sync.js
    - 浏览器缓存
    - CDN 缓存
    - 预加载关键资源
+
+## 安全建议
+
+1. 环境变量
+   - 使用 `.env` 文件存储敏感配置
+   - 不要将 `.env` 文件提交到代码仓库
+   - 定期更新 API 密钥
+
+2. 图片上传
+   - 限制上传文件大小
+   - 验证文件类型
+   - 使用安全的文件名
+
+3. 访问控制
+   - 配置适当的 CORS 策略
+   - 使用 HTTPS
+   - 限制 API 访问频率
 
 ## 常见问题
 
