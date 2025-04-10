@@ -20,9 +20,17 @@ yarn-error.log
 Thumbs.db
 
 # Logs
-logs
+logs/
 *.log
 
 # Build output
 dist/
-build/ 
+build/
+
+# Temporary files
+tmp/
+temp/
+downloads/
+
+# Local image cache
+notion_images/ 
