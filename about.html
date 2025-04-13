@@ -32,13 +32,51 @@
         }
         p {
             font-weight: 300;
+            line-height: 1.8;
+        }
+        .signature {
+            margin-top: 2.5rem;
+            text-align: right;
+        }
+        .signature img {
+            height: 90px;
+            width: auto;
+            opacity: 0.85;
+            display: inline-block;
+            transform: rotate(-2deg);
+        }
+        .photo-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            height: 100%;
+        }
+        .photo-container img {
+            object-fit: cover;
+            max-height: 100%;
+            width: 100%;
+        }
+        .about-content {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding-top: 0;
+        }
+        .about-content h2 {
+            margin-bottom: 1.5rem;
+        }
+        .text-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
         }
     </style>
 </head>
 <body class="bg-white text-gray-800">
-    <div class="container mx-auto px-6 py-12 max-w-4xl">
+    <div class="container mx-auto px-6 py-8 max-w-4xl">
         <!-- 顶部导航 -->
-        <div class="flex justify-between items-center mb-16 pb-4 border-b border-gray-100">
+        <div class="flex justify-between items-center mb-12 pb-4 border-b border-gray-100">
             <h1 class="text-lg font-light">关于</h1>
             <nav>
                 <ul class="flex space-x-10">
@@ -49,29 +87,30 @@
         </div>
         
         <!-- 内容区 -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-16">
-            <div class="md:col-span-1 fade-in" style="animation-delay: 0.2s;">
-                <img src="assets/misc/photographer.jpg" alt="摄影师照片" class="w-full">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-16 md:min-h-[600px]">
+            <div class="md:col-span-1 fade-in photo-container" style="animation-delay: 0.2s;">
+                <img src="http://xingyan-photo.oss-cn-hangzhou.aliyuncs.com/about/photographer.jpg" alt="摄影师照片" class="w-full">
             </div>
-            <div class="md:col-span-2 space-y-8 fade-in" style="animation-delay: 0.4s;">
-                <h2 class="text-xl font-light mb-8">关于摄影师</h2>
+            <div class="md:col-span-2 fade-in about-content" style="animation-delay: 0.4s;">
+                <h2 class="text-xl font-light">关于摄影师</h2>
                 
-                <p class="leading-relaxed text-gray-700">
-                    作为一名热爱摄影的艺术家，我致力于通过镜头捕捉世界的独特瞬间和视角。我的摄影作品跨越自然风光、人像、街头和建筑等多个领域，每一张照片都是我对光影、构图和情感的探索。
-                </p>
+                <div class="text-container">
+                    <p class="text-gray-700">
+                        作为一名热爱摄影的理性探索者，我通过镜头捕捉生活中那些易被忽略的精彩瞬间。我的摄影作品主要聚焦于人像（特别是我的妻子和宝宝）、街头即兴和生活场景，每一张照片都是我对光影、构图和情感的系统性表达。
+                    </p>
+                    
+                    <p class="text-gray-700">
+                        我的摄影理念是"用理性的眼光发现情感的瞬间"。在日常生活和家庭互动中，我善于捕捉那些转瞬即逝的真实情绪和细节。通过摄影，我不仅记录家庭成长的珍贵时刻，也希望与观者分享我对世界的独特解读。
+                    </p>
+                    
+                    <p class="text-gray-700">
+                        我的作品呈现出结构化与自然的平衡，追求清晰的构图逻辑，同时保留被摄主体的真实表达。我相信最打动人心的照片来自于对细节的敏锐观察和对时机的精准把握，这与我在工作中的统筹和专注特质高度一致。摄影是我在忙碌工作之外，表达内心世界的重要方式。
+                    </p>
+                </div>
                 
-                <p class="leading-relaxed text-gray-700">
-                    我的摄影理念是"看见平凡中的非凡"。在日常生活和熟悉的环境中，我总能发现那些被忽视的美丽细节和瞬间。通过摄影，我希望能与观者分享这些独特的视角和感受。
-                </p>
-                
-                <p class="leading-relaxed text-gray-700">
-                    我的作品受到极简主义美学的影响，注重留白和简洁的构图，让被摄主体自然地表达自己的故事。我相信最有力量的照片往往是最简单直接的，它们不需要过多的修饰和技巧，而是通过真实和情感打动人心。
-                </p>
-                
-                <div class="mt-16 pt-8 border-t border-gray-100 fade-in" style="animation-delay: 0.6s;">
-                    <h3 class="text-base font-light mb-6">联系方式</h3>
-                    <p class="text-sm text-gray-600">邮箱: <a href="mailto:contact@example.com" class="hover:underline">contact@example.com</a></p>
-                    <p class="text-sm text-gray-600">Instagram: <a href="#" class="hover:underline">@photographyportfolio</a></p>
+                <!-- 签名 -->
+                <div class="signature fade-in" style="animation-delay: 0.7s;">
+                    <img src="http://xingyan-photo.oss-cn-hangzhou.aliyuncs.com/signature/signature.png" alt="摄影师签名" class="signature-img">
                 </div>
             </div>
         </div>
