@@ -21,7 +21,13 @@ function getOssUrl(path) {
 }
 
 // 配置 CORS 和 JSON 解析
-app.use(cors());
+app.use(cors({
+  origin: '*', // 允许所有来源访问
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  maxAge: 86400 // 预检请求缓存时间，单位秒
+}));
 app.use(express.json());
 
 // 提供静态文件

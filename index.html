@@ -190,8 +190,10 @@
     </div>
 
     <script>
-        // API 基础URL - 在实际部署时需要更改
-        const API_BASE_URL = 'http://localhost:3000/api';
+        // API 基础URL - 自动根据当前环境确定
+        const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:3000/api'  // 本地开发环境
+            : `${window.location.origin}/api`;  // 生产环境
         // 存储系列数据
         let seriesData = {};
 
@@ -277,8 +279,13 @@
             
             try {
                 console.log(`请求系列的专辑: ${seriesId}`);
+                console.log(`使用API URL: ${API_BASE_URL}/series/${seriesId}/albums`);
+                
                 const response = await fetch(`${API_BASE_URL}/series/${seriesId}/albums`);
-                if (!response.ok) throw new Error('Failed to fetch albums');
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`加载失败 (${response.status}): ${errorText || response.statusText}`);
+                }
                 
                 const albums = await response.json();
                 // 存储数据以供后续使用
@@ -288,10 +295,13 @@
                 displayAlbums(albums);
             } catch (error) {
                 console.error('Error fetching albums:', error);
-                // 显示错误提示
+                // 显示详细错误提示
                 albumsContainer.innerHTML = `
-                    <div class="col-span-full text-center py-20 text-gray-500">
-                        加载失败，请刷新页面重试
+                    <div class="col-span-full text-center py-20">
+                        <p class="text-red-500 mb-2">加载失败</p>
+                        <p class="text-gray-500 text-sm">${error.message}</p>
+                        <p class="text-gray-500 text-sm mt-3">API URL: ${API_BASE_URL}</p>
+                        <button class="mt-4 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300" onclick="fetchAlbumsBySeries('${seriesId}')">重试</button>
                     </div>
                 `;
             }
