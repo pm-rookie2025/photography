@@ -6,7 +6,7 @@
     { "src": "assets/**", "use": "@vercel/static" }
   ],
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/server.js" },
+    { "source": "/api/(.*)", "destination": "server.js" },
     { "source": "/(.*).html", "destination": "/$1.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],

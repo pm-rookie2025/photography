@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>摄影作品集</title>
+    <title>XY Vision</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -162,21 +162,21 @@
                     <line x1="10" y1="4" x2="14" y2="4" />
                     <line x1="8" y1="2" x2="16" y2="2" />
                 </svg>
-                <span>Photography</span>
+                <span>XY Vision</span>
             </h1>
             
             <nav class="mb-16">
                 <ul class="space-y-5">
                     <!-- 固定系列 -->
-                    <li><a href="#" class="series-item active text-sm" data-series="浮光半日·随拍">浮光半日·随拍</a></li>
-                    <li><a href="#" class="series-item text-sm" data-series="娜些时光">娜些时光</a></li>
-                    <li><a href="#" class="series-item text-sm" data-series="希希物语">希希物语</a></li>
+                    <li><a href="#" class="series-item active text-lg" data-series="浮光半日·随拍">浮光半日·随拍</a></li>
+                    <li><a href="#" class="series-item text-lg" data-series="娜些时光">娜些时光</a></li>
+                    <li><a href="#" class="series-item text-lg" data-series="希希物语">希希物语</a></li>
                 </ul>
             </nav>
             
             <div class="mt-auto">
                 <ul class="space-y-5">
-                    <li><a href="about.html" class="hover:underline text-sm">关于</a></li>
+                    <li><a href="about.html" class="hover:underline text-lg">关于</a></li>
                 </ul>
             </div>
         </div>
@@ -238,7 +238,7 @@
             
             series.forEach((item, index) => {
                 const li = document.createElement('li');
-                li.innerHTML = `<a href="#" class="series-item ${index === 0 ? 'active' : ''} text-sm" data-series="${item.id}">${item.name}</a>`;
+                li.innerHTML = `<a href="#" class="series-item ${index === 0 ? 'active' : ''} text-lg" data-series="${item.id}">${item.name}</a>`;
                 nav.appendChild(li);
             });
             
@@ -349,8 +349,8 @@
                                 loading="lazy"
                             >
                         </div>
-                        <h3 class="mt-3 mb-1 text-xs font-light uppercase tracking-wider">${album.title}</h3>
-                        <div class="text-[10px] text-gray-500 flex items-center gap-2">
+                        <h3 class="mt-3 mb-1 text-base font-light uppercase tracking-wider">${album.title}</h3>
+                        <div class="text-base text-gray-500 flex items-center gap-2">
                             ${album.location ? `<p class="font-light">${album.location}</p>` : ''}
                             ${album.location && album.date ? `<span class="font-light">·</span>` : ''}
                             ${album.date ? `<p class="font-light">${new Date(album.date).toLocaleDateString('zh-CN', {year: 'numeric', month: 'long'})}</p>` : ''}
