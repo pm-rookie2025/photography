@@ -5,11 +5,10 @@
     { "src": "*.html", "use": "@vercel/static" },
     { "src": "assets/**", "use": "@vercel/static" }
   ],
-  "routes": [
-    { "src": "/api/(.*)", "dest": "server.js" },
-    { "src": "/(.*\\.(js|css|jpg|jpeg|png|gif|ico|svg))", "dest": "/$1" },
-    { "src": "/(.*)", "dest": "/$1.html" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/server.js" },
+    { "source": "/(.*).html", "destination": "/$1.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
     {
