@@ -4,9 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Xingyan Gallery</title>
-    <link rel="icon" href="assets/images/liulanqi.svg" type="image/svg+xml">
+    <link rel="icon" href="assets/images/光圈-copy.svg" type="image/svg+xml">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://at.alicdn.com/t/c/font_4902131_mf5n8tfonf.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Helvetica', 'Arial', sans-serif;
@@ -90,6 +93,14 @@
             color: currentColor;
             line-height: 1;
         }
+        .logo-text {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 30px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            line-height: 1;
+        }
         /* 加载动画 */
         .loading-container {
             display: flex;
@@ -165,7 +176,7 @@
         <div class="w-full md:w-1/4 pr-0 md:pr-12 mb-12 md:mb-0 md:sticky md:top-12 md:self-start">
             <h1 class="text-2xl font-light uppercase tracking-widest mb-16 site-title flex items-center">
                 <i class="iconfont icon-wodejiepai"></i>
-                <img src="assets/images/logo2.jpg" alt="XY Vision Logo" style="height: 60px; width: auto;">
+                <span class="logo-text">XINGYAN</span>
             </h1>
             
             <nav class="mb-16">
