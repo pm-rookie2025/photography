@@ -24,22 +24,19 @@ const OSS_CONFIG = {
   // CDN 域名 (如果有)
   cdnDomain: process.env.OSS_CDN_DOMAIN || '',
   // 上传路径前缀 (可选)
-  prefix: process.env.OSS_PREFIX || 'photo-portfolio/'
+  prefix: (process.env.OSS_PREFIX || 'photo-portfolio/').replace(/[/]?$/, '/')
 };
 
 // 配置项
 const CONFIG = {
   notionDatabaseId: process.env.NOTION_DATABASE_ID,
-  localDownloadPath: path.join(__dirname, 'downloads'),
-  compressedImagesPath: path.join(__dirname, 'compressed'),
-  organizedImagesPath: path.join(__dirname, 'organized_images'),
-  maxSizeInMB: 2,
-  compressionQuality: 80, // 0-100, 越低压缩率越高
   tempDir: path.join(__dirname, 'temp'),
   outputJsonPath: path.join(__dirname, 'data', 'albums.json'),
-  skipExistingImages: true, // 如果图片已经处理过，是否跳过
-  useOSS: false, // 修改为false，优先保存本地图片
-  saveOrganized: true, // 新增：是否按系列和专辑保存组织好的图片
+  processedImagesRecordPath: path.join(__dirname, 'data', 'processed_images.json'),
+  maxSizeInMB: 2,
+  compressionQuality: 80, // 0-100, 越低压缩率越高
+  skipExistingImages: true, // 如果图片已经处理过 (记录在案)，是否跳过
+  useOSS: true, // 默认使用OSS，如果配置不完整则自动降级
 };
 
 // 创建阿里云OSS客户端
@@ -65,10 +62,9 @@ function createOssClient() {
 // 创建必要的目录
 async function createDirectories() {
   const dirs = [
-    CONFIG.localDownloadPath,
-    CONFIG.compressedImagesPath,
     CONFIG.tempDir,
-    path.dirname(CONFIG.outputJsonPath)
+    path.dirname(CONFIG.outputJsonPath),
+    path.dirname(CONFIG.processedImagesRecordPath)
   ];
   
   for (const dir of dirs) {
@@ -318,55 +314,260 @@ async function compressImage(inputPath, outputPath) {
 // 上传图片到阿里云OSS
 async function uploadToOSS(imagePath, objectName) {
   const ossClient = createOssClient();
-  if (!ossClient) {
-    console.log('OSS客户端未初始化，跳过上传');
-    return { success: false, url: '' };
+  if (!CONFIG.useOSS || !ossClient) {
+    console.log('OSS未启用或配置不完整，跳过上传，将使用本地路径（如果支持）。');
+    return { success: false, url: '', thumbnailUrl: '', display_url: '' };
   }
-  
+
   try {
-    console.log(`上传图片到阿里云OSS: ${imagePath}`);
-    // 构建完整的对象名，添加前缀
-    const fullObjectName = `${OSS_CONFIG.prefix}${objectName}`;
-    
-    // 上传文件
+    console.log(`  上传图片到阿里云OSS: ${path.basename(imagePath)} -> ${objectName}`);
+    const fullObjectName = `${OSS_CONFIG.prefix}${objectName}`.replace(/^\/+/, '');
+
     const result = await ossClient.put(fullObjectName, imagePath);
-    
+
     if (result.res.status === 200) {
-      // 构建URL
       let url;
       if (OSS_CONFIG.cdnDomain) {
-        // 使用CDN域名
         url = `https://${OSS_CONFIG.cdnDomain}/${fullObjectName}`;
       } else {
-        // 使用OSS默认域名
-        url = result.url;
+        url = `https://${OSS_CONFIG.bucket}.${OSS_CONFIG.region}.aliyuncs.com/${fullObjectName}`;
       }
-      
-      // 生成缩略图URL (使用OSS的图片处理服务)
-      const thumbnailUrl = `${url}?x-oss-process=image/resize,w_300`;
-      
-      console.log(`图片上传成功: ${url}`);
+
+      const thumbnailUrl = `${url}?x-oss-process=image/resize,w_300/quality,q_80`;
+      const displayUrl = `${url}?x-oss-process=image/resize,w_1200/quality,q_85`;
+
+      console.log(`  图片上传成功: ${url}`);
       return {
         success: true,
         url: url,
-        display_url: url,
+        display_url: displayUrl,
         thumbnail: thumbnailUrl
       };
     } else {
-      console.error('图片上传失败:', result);
-      return { success: false, url: '' };
+      console.error('  图片上传失败:'), result.res.statusMessage;
+      return { success: false, url: '', thumbnailUrl: '', display_url: '' };
     }
   } catch (error) {
-    console.error(`上传图片失败 ${imagePath}:`, error.message);
-    return { success: false, url: '' };
+    console.error(`  上传图片失败 ${path.basename(imagePath)}:`), error.message;
+    return { success: false, url: '', thumbnailUrl: '', display_url: '' };
   }
 }
 
-// 处理单个图片 - 下载、压缩、上传
-async function processImage(imageUrl, albumId, imageIndex) {
+// 新增参数: seriesName, albumName
+async function processImage(imageUrl, seriesName, albumName, albumId, imageIndex, processedImages, chalk) {
+  let tempSavePath = '';
   try {
-    // 生成文件名
+    if (CONFIG.skipExistingImages && processedImages[imageUrl]) {
+        console.log(chalk.cyan(`  图片已处理过 (根据记录): ${imageUrl} -> ${processedImages[imageUrl].url}`));
+        return processedImages[imageUrl];
+    }
+
+    console.log(chalk.blue(`处理图片 ${imageIndex}: ${imageUrl}`));
+
     const urlObj = new URL(imageUrl);
     const originalFilename = path.basename(urlObj.pathname).split('?')[0];
     const fileExtension = path.extname(originalFilename) || '.jpg';
-    const safeFilename = `${albumId.substring(0, 8)}_image${imageIndex}${fileExtension}`
+    const safeFilenameBase = `${seriesName}_${albumName}_${imageIndex}`.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+    const safeFilename = `${safeFilenameBase}${fileExtension}`;
+
+    const tempDownloadDir = path.join(CONFIG.tempDir, 'downloads');
+    await mkdirp(tempDownloadDir);
+    tempSavePath = path.join(tempDownloadDir, safeFilename);
+
+    const downloaded = await downloadImage(imageUrl, tempSavePath);
+    if (!downloaded) {
+      console.error(chalk.red(`  下载图片失败: ${imageUrl}`));
+      return null;
+    }
+
+    const tempCompressDir = path.join(CONFIG.tempDir, 'compressed');
+    await mkdirp(tempCompressDir);
+    const compressedPath = path.join(tempCompressDir, safeFilename);
+    const compressed = await compressImage(tempSavePath, compressedPath);
+
+    const sourcePathForUpload = compressed ? compressedPath : tempSavePath;
+
+    const ossObjectName = path.join(seriesName, albumName, safeFilename).replace(/\\/g, '/');
+
+    const uploadResult = await uploadToOSS(sourcePathForUpload, ossObjectName);
+
+    try {
+        await fs.promises.unlink(tempSavePath);
+        if (compressed) await fs.promises.unlink(compressedPath);
+        console.log(chalk.gray(`  已删除临时文件: ${path.basename(tempSavePath)}${compressed ? ', ' + path.basename(compressedPath) : ''}`));
+    } catch (cleanupError) {
+        console.warn(chalk.yellow(`  清理临时文件失败: ${cleanupError.message}`));
+    }
+
+    if (!uploadResult || !uploadResult.success) {
+      console.error(chalk.red(`  处理图片失败 (上传步骤): ${safeFilename}`));
+      return null;
+    }
+
+    console.log(chalk.green(`  成功处理图片: ${path.basename(safeFilename)}`));
+    return {
+        original_url: imageUrl,
+        url: uploadResult.url,
+        display_url: uploadResult.display_url,
+        thumbnail: uploadResult.thumbnail,
+        alt: path.basename(safeFilename, fileExtension).replace(/_/g, ' ')
+    };
+
+  } catch (error) {
+    console.error(chalk.red(`处理图片 ${imageUrl} 时发生严重错误:`), error);
+    if (tempSavePath && fs.existsSync(tempSavePath)) {
+        try { await fs.promises.unlink(tempSavePath); } catch (e) {}
+    }
+    return null;
+  }
+}
+
+async function main() {
+  const chalk = (await import('chalk')).default;
+  console.log(chalk.bold.yellow('=== 开始图片处理流程 ==='));
+  const startTime = Date.now();
+
+  let processedImages = {};
+  try {
+    if (fs.existsSync(CONFIG.processedImagesRecordPath)) {
+      const data = await fs.promises.readFile(CONFIG.processedImagesRecordPath, 'utf-8');
+      processedImages = JSON.parse(data);
+      console.log(chalk.gray(`已加载 ${Object.keys(processedImages).length} 条已处理图片记录`));
+    }
+  } catch (err) {
+    console.warn(chalk.yellow('加载已处理图片记录失败，将重新处理所有图片:', err.message));
+    processedImages = {};
+  }
+
+  try {
+    await createDirectories();
+    await rimraf(CONFIG.tempDir);
+    await mkdirp(CONFIG.tempDir);
+    console.log(chalk.gray('已清理并创建临时目录'));
+
+    const seriesData = await getAllSeriesAndAlbums();
+    if (!seriesData || seriesData.length === 0) {
+      console.log(chalk.yellow('未能获取到任何系列和专辑信息。'));
+      return;
+    }
+    console.log(chalk.cyan(`获取到 ${seriesData.length} 个系列`));
+
+    let totalImagesProcessed = 0;
+    let totalImagesSkipped = 0;
+
+    for (const series of seriesData) {
+      console.log(chalk.magenta(`\n处理系列: ${series.name}`));
+      const seriesNameForPath = series.name.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+
+      if (!series.albums || series.albums.length === 0) {
+          console.log(chalk.yellow('  此系列下没有专辑。'));
+          continue;
+      }
+
+      for (const album of series.albums) {
+        console.log(chalk.blue(`  处理专辑: ${album.title}`));
+        const albumNameForPath = album.title.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+
+        const imagesToProcess = await getAlbumImages(album.id);
+        album.images = [];
+
+        if (!imagesToProcess || imagesToProcess.length === 0) {
+            console.log(chalk.yellow('    此专辑下没有图片。'));
+            continue;
+        }
+         console.log(chalk.gray(`    找到 ${imagesToProcess.length} 张图片待处理...`));
+
+        let imageIndex = 1;
+        for (const image of imagesToProcess) {
+          const result = await processImage(
+            image.src,
+            seriesNameForPath,
+            albumNameForPath,
+            album.id,
+            imageIndex,
+            processedImages,
+            chalk
+          );
+
+          if (result) {
+            if (processedImages[image.src] && CONFIG.skipExistingImages) {
+                 album.images.push(processedImages[image.src]);
+                 totalImagesSkipped++;
+            } else if (result.url) {
+                 album.images.push(result);
+                 processedImages[image.src] = result;
+                 totalImagesProcessed++;
+            } else {
+                 console.warn(chalk.yellow(`    处理图片 ${imageIndex} (${image.src}) 失败，已跳过。`));
+            }
+          } else {
+               console.warn(chalk.yellow(`    处理图片 ${imageIndex} (${image.src}) 失败，已跳过。`));
+          }
+          imageIndex++;
+        }
+
+        if (!album.cover && album.images.length > 0) {
+            album.cover = album.images[0].url;
+            album.cover_thumbnail = album.images[0].thumbnail;
+            console.log(chalk.gray(`    已设置专辑封面为第一张图片: ${album.cover}`));
+        } else if (album.cover) {
+            console.log(chalk.blue('    处理专辑封面图片...'));
+            const coverResult = await processImage(
+                album.cover,
+                seriesNameForPath,
+                albumNameForPath,
+                album.id,
+                'cover',
+                processedImages,
+                chalk
+            );
+             if (coverResult && coverResult.url) {
+                 album.cover = coverResult.url;
+                 album.cover_thumbnail = coverResult.thumbnail;
+                 processedImages[album.cover] = coverResult;
+                 totalImagesProcessed++;
+                 console.log(chalk.green(`    专辑封面处理成功: ${album.cover}`));
+             } else if (processedImages[album.cover] && CONFIG.skipExistingImages) {
+                 album.cover = processedImages[album.cover].url;
+                 album.cover_thumbnail = processedImages[album.cover].thumbnail;
+                 totalImagesSkipped++;
+                 console.log(chalk.cyan(`    专辑封面已处理过 (根据记录): ${album.cover}`));
+             } else {
+                 console.warn(chalk.yellow('    处理专辑封面图片失败，保留原始URL或为空。'));
+                 album.cover_thumbnail = '';
+             }
+        }
+      }
+    }
+
+    try {
+        await fs.promises.writeFile(CONFIG.outputJsonPath, JSON.stringify(seriesData, null, 2));
+        console.log(chalk.bold.green(`\n✅ 专辑数据已成功保存到: ${CONFIG.outputJsonPath}`));
+    } catch (writeError) {
+        console.error(chalk.red(`保存专辑数据到 JSON 文件失败: ${writeError.message}`));
+    }
+
+    try {
+        await fs.promises.writeFile(CONFIG.processedImagesRecordPath, JSON.stringify(processedImages, null, 2));
+        console.log(chalk.gray(`已处理图片记录已保存到: ${CONFIG.processedImagesRecordPath}`));
+    } catch (writeError) {
+        console.error(chalk.red(`保存已处理图片记录失败: ${writeError.message}`));
+    }
+
+    await rimraf(CONFIG.tempDir);
+    console.log(chalk.gray('已清理临时目录'));
+
+    const endTime = Date.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    console.log(chalk.bold.yellow(`\n=== 图片处理流程结束 ===`));
+    console.log(chalk.cyan(`总耗时: ${duration} 秒`));
+    console.log(chalk.green(`成功处理图片: ${totalImagesProcessed} 张`));
+    console.log(chalk.cyan(`跳过已处理图片: ${totalImagesSkipped} 张`));
+
+  } catch (error) {
+    console.error(chalk.bold.red('\n处理流程发生严重错误:'), error);
+    try { await rimraf(CONFIG.tempDir); } catch (e) {}
+  }
+}
+
+main();

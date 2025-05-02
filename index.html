@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>XY Vision</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://at.alicdn.com/t/c/font_4902131_mf5n8tfonf.css">
     <style>
         body {
             font-family: 'Helvetica', 'Arial', sans-serif;
@@ -73,14 +74,20 @@
             100% { transform: translate(-50%, -50%) rotate(360deg); }
         }
         .camera-icon {
-            height: 30px;
-            width: auto;
-            margin-right: 16px;
-            vertical-align: middle;
+            /* height: 30px; */
+            /* width: auto; */
+            /* margin-right: 16px; */
+            /* vertical-align: middle; */
         }
         .site-title {
             display: flex;
             align-items: center;
+        }
+        .iconfont.icon-wodejiepai {
+            font-size: 30px;
+            margin-right: 12px;
+            color: currentColor;
+            line-height: 1;
         }
         /* 加载动画 */
         .loading-container {
@@ -155,14 +162,9 @@
     <div class="container mx-auto px-6 py-12 flex flex-col md:flex-row">
         <!-- 左侧导航 -->
         <div class="w-full md:w-1/4 pr-0 md:pr-12 mb-12 md:mb-0 md:sticky md:top-12 md:self-start">
-            <h1 class="text-2xl font-light uppercase tracking-widest mb-16 site-title">
-                <svg class="camera-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <rect x="2" y="6" width="20" height="12" rx="2" />
-                    <circle cx="12" cy="12" r="4" />
-                    <line x1="10" y1="4" x2="14" y2="4" />
-                    <line x1="8" y1="2" x2="16" y2="2" />
-                </svg>
-                <span>XY Vision</span>
+            <h1 class="text-2xl font-light uppercase tracking-widest mb-16 site-title flex items-center">
+                <i class="iconfont icon-wodejiepai"></i>
+                <img src="logo2.jpg" alt="XY Vision Logo" style="height: 60px; width: auto;">
             </h1>
             
             <nav class="mb-16">
