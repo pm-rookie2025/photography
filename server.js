@@ -130,8 +130,17 @@ app.get('/api/albums/:albumId', async (req, res) => {
       return res.status(404).json({ error: '未找到指定专辑' });
     }
     
+    // 按索引对图片进行排序
+    const sortedImages = [...albumData.images];
+    sortedImages.sort((a, b) => {
+      // 确保所有图片都有索引，如果没有则使用其在数组中的位置
+      const indexA = typeof a.index === 'number' ? a.index : 0;
+      const indexB = typeof b.index === 'number' ? b.index : 0;
+      return indexA - indexB;
+    });
+    
     // 转换图片路径为完整的 OSS URL
-    const images = albumData.images.map(image => ({
+    const images = sortedImages.map(image => ({
       src: getOssUrl(image.path),
       alt: image.alt || albumData.title
     }));
