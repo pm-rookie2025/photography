@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XY Vision</title>
+    <!-- 添加 Favicon 链接 -->
+    <link rel="icon" href="assets/images/光圈-copy.svg" type="image/svg+xml">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Google手写体字体 -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@100;300;400&display=swap');
+        
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            letter-spacing: 0.02em;
+            background-color: #ffffff;
+        }
+        
+        /* 页面容器 */
+        .page-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            min-height: 100vh;
+            border-left: none;
+            border-right: none;
+            padding-bottom: 2rem;
+        }
+        
+        /* 主要内容区域 */
+        .main-content {
+            max-width: 900px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0 1.5rem;
+        }
+        
+        .loading-placeholder {
+            background: linear-gradient(90deg, #f0f0f0 25%, #f8f8f8 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+        
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        .fade-in {
+            opacity: 0;
+            transition: opacity 0.8s ease-in-out;
+        }
+        
+        .fade-in.loaded {
+            opacity: 1;
+        }
+        
+        .nav-item {
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .nav-item:hover {
+            opacity: 0.7;
+        }
+        
+        .album-title {
+            font-weight: 300;
+            letter-spacing: 0.05em;
+        }
+        
+        .thumbnail-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+            justify-content: center;
+        }
+        
+        .thumbnail {
+            width: 48px;
+            height: 48px;
+            object-fit: cover;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+        
+        @media (min-width: 640px) {
+            .thumbnail {
+                width: 56px;
+                height: 56px;
+            }
+        }
+        
+        .thumbnail:hover {
+            opacity: 1;
+        }
+        
+        .thumbnail.active {
+            opacity: 1;
+            border: 1px solid transparent;
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+        }
+        
+        .camera-icon {
+            height: 30px;
+            width: auto;
+            margin-right: 16px;
+            vertical-align: middle;
+        }
+        
+        .site-title {
+            display: flex;
+            align-items: center;
+        }
+
+        .divider {
+            width: 1px;
+            height: 12px;
+            background-color: rgba(156, 163, 175, 0.5);
+            margin: 0 12px;
+            display: none; /* 隐藏竖向分隔线 */
+        }
+        
+        .horizontal-divider {
+            height: 1px;
+            background-color: rgba(156, 163, 175, 0.15);
+            width: 100%;
+            margin: 0.5rem 0;
+        }
+        
+        .image-info {
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        
+        .main-image-container:hover .image-info {
+            opacity: 1;
+        }
+        
+        .nav-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: opacity 0.2s ease;
+            opacity: 0.4;
+            z-index: 10;
+            color: rgba(0, 0, 0, 0.6);
+            background-color: rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+        }
+        
+        .nav-arrow:hover {
+            opacity: 0.7;
+            background-color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .nav-arrow-left {
+            left: 1rem;
+        }
+        
+        .nav-arrow-right {
+            right: 1rem;
+        }
+        
+        .album-info {
+            text-align: center;
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        .album-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            padding: 1rem 1.5rem;
+        }
+        
+        .header-title {
+            font-size: 1.3rem;
+            font-weight: 300;
+            letter-spacing: 0.05em;
+        }
+        
+        .header-menu {
+            display: flex;
+            gap: 1.8rem;
+        }
+        
+        .header-menu a {
+            font-size: 1.1rem;
+            font-weight: 400;
+            letter-spacing: 0.05em;
+            transition: all 0.2s ease;
+        }
+        
+        .header-menu a:hover {
+            opacity: 0.7;
+        }
+        
+        /* 调整主图的高度，确保一屏内能看到所有内容 */
+        @media (min-height: 700px) {
+            .main-image-container {
+                max-height: 60vh;
+            }
+        }
+        
+        @media (max-height: 700px) {
+            .main-image-container {
+                max-height: 50vh;
+            }
+        }
+        
+        @media (max-width: 640px) {
+            .header-menu {
+                gap: 1rem;
+            }
+            
+            .header-title, .header-menu a {
+                font-size: 1rem;
+            }
+            
+            .album-header {
+                padding: 0.75rem 1rem;
+            }
+        }
+        
+        /* 全屏按钮样式 */
+        .fullscreen-btn {
+            position: absolute;
+            bottom: 1rem;
+            right: 1rem;
+            width: 40px;
+            height: 40px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            opacity: 0.5;
+            z-index: 20;
+        }
+        
+        .fullscreen-btn:hover {
+            opacity: 1;
+        }
+        
+        /* 轮播动画 */
+        .carousel-slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 0.8s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .carousel-slide.active {
+            opacity: 1;
+            z-index: 5;
+        }
+        
+        /* 全屏模式样式 */
+        .fullscreen-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.95);
+            z-index: 1000;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .fullscreen-overlay.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 1;
+        }
+        
+        .fullscreen-image {
+            max-width: 90%;
+            max-height: 90vh;
+            object-fit: contain;
+        }
+        
+        .fullscreen-close {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: white;
+            font-size: 1.5rem;
+            z-index: 1010;
+            opacity: 0.7;
+            transition: opacity 0.2s ease;
+        }
+        
+        .fullscreen-close:hover {
+            opacity: 1;
+        }
+        
+        .fullscreen-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: rgba(255, 255, 255, 0.7);
+            z-index: 1010;
+            opacity: 0.5;
+            transition: opacity 0.2s ease;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 50%;
+        }
+        
+        .fullscreen-nav:hover {
+            opacity: 0.8;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        
+        .fullscreen-prev {
+            left: 1.5rem;
+        }
+        
+        .fullscreen-next {
+            right: 1.5rem;
+        }
+        
+        .fullscreen-caption {
+            position: absolute;
+            bottom: 1.5rem;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 300;
+            padding: 0 2rem;
+            display: none; /* 隐藏全屏模式下的图片说明 */
+        }
+        
+    </style>
+</head>
+<body class="bg-white text-gray-800">
+    <div class="page-container">
+        <!-- 页面头部 -->
+        <div class="album-header">
+            <h1 id="album-title-with-series" class="header-title">加载中...</h1>
+            <div class="header-menu">
+                <a href="/" class="nav-item">首页</a>
+                <a href="/about.html" class="nav-item">关于</a>
+            </div>
+        </div>
+        
+        <div class="horizontal-divider"></div>
+        
+        <div class="main-content">
+            <!-- 主图容器 -->
+            <div class="main-image-container relative overflow-hidden group w-full mt-2" style="aspect-ratio: 4/3;">
+                <div id="carousel-container" class="w-full h-full relative">
+                    <!-- 图片将通过JavaScript动态添加 -->
+                </div>
+                
+                <div class="nav-arrow nav-arrow-left" id="prev-image">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M15 18l-6-6 6-6"></path>
+                    </svg>
+                </div>
+                <div class="nav-arrow nav-arrow-right" id="next-image">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M9 18l6-6-6-6"></path>
+                    </svg>
+                </div>
+                
+                <div class="fullscreen-btn" id="fullscreen-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
+                        <path d="M21 8V5a2 2 0 0 0-2-2h-3"></path>
+                        <path d="M3 16v3a2 2 0 0 0 2 2h3"></path>
+                        <path d="M16 21h3a2 2 0 0 0 2-2v-3"></path>
+                    </svg>
+                </div>
+            </div>
+            
+            <div class="image-info mb-2">
+                <p id="image-caption" class="text-sm font-light text-gray-600 text-center"></p>
+            </div>
+            
+            <!-- 缩略图导航 -->
+            <div class="thumbnail-nav w-full" id="thumbnails">
+                <!-- 缩略图将通过JavaScript动态生成 -->
+        </div>
+
+            <!-- 专辑信息 -->
+            <div class="album-info">
+                <div class="flex items-center justify-center text-base text-gray-500 font-light tracking-wide">
+                    <span id="album-location" class="location"></span>
+                    <span id="album-date" class="date ml-2"></span>
+                </div>
+            </div>
+            </div>
+        </div>
+
+    <!-- 全屏查看模式 -->
+    <div class="fullscreen-overlay" id="fullscreen-overlay">
+        <div class="fullscreen-close" id="fullscreen-close">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M18 6L6 18"></path>
+                <path d="M6 6l12 12"></path>
+            </svg>
+        </div>
+        <div class="fullscreen-nav fullscreen-prev" id="fullscreen-prev">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M15 18l-6-6 6-6"></path>
+            </svg>
+            </div>
+        <img id="fullscreen-image" class="fullscreen-image" src="" alt="">
+        <div class="fullscreen-nav fullscreen-next" id="fullscreen-next">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M9 18l6-6-6-6"></path>
+            </svg>
+        </div>
+        <div class="fullscreen-caption" id="fullscreen-caption"></div>
+    </div>
+
+    <script>
+        // 图片配置
+        const imageConfig = {
+            ossDomain: 'http://xingyan-photo.oss-cn-hangzhou.aliyuncs.com',
+            thumbnailParams: '?x-oss-process=image/resize,w_400,h_400,m_fill/quality,q_80',
+            fullImageParams: '?x-oss-process=image/resize,w_1920,m_lfit/quality,q_90',
+            previewParams: '?x-oss-process=image/resize,w_800,m_lfit/quality,q_85'
+        };
+
+        // API 基础URL
+        const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:3000/api'  // 本地开发环境
+            : `${window.location.origin}/api`;  // 生产环境
+        
+        // 获取URL参数
+        function getUrlParam(param) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(param);
+        }
+
+        // 预加载队列
+        const preloadQueue = [];
+        let isPreloading = false;
+
+        // 添加到预加载队列
+        function addToPreloadQueue(url) {
+            if (!preloadQueue.includes(url)) {
+                preloadQueue.push(url);
+                startPreloading();
+            }
+        }
+
+        // 开始预加载
+        async function startPreloading() {
+            if (isPreloading || preloadQueue.length === 0) return;
+            
+            isPreloading = true;
+            while (preloadQueue.length > 0) {
+                const url = preloadQueue.shift();
+                try {
+                    await preloadImage(url);
+                } catch (error) {
+                    console.error('预加载图片失败:', error);
+                }
+            }
+            isPreloading = false;
+        }
+
+        // 预加载图片
+        function preloadImage(url) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = url;
+            });
+        }
+
+        // 获取并显示专辑内容
+        async function fetchAndDisplayAlbum() {
+            const albumId = getUrlParam('id');
+            if (!albumId) {
+                console.error('没有指定专辑ID');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/albums/${albumId}`);
+                if (!response.ok) throw new Error('Failed to fetch album details');
+                
+                const album = await response.json();
+                displayAlbum(album);
+            } catch (error) {
+                console.error('Error fetching album details:', error);
+            }
+        }
+
+        // 显示专辑内容
+        function displayAlbum(album) {
+            // 设置标题格式：专辑名｜系列名
+            const titleWithSeries = `${album.title} | ${album.series}`;
+            document.getElementById('album-title-with-series').textContent = titleWithSeries;
+            document.title = titleWithSeries;
+            
+            const locationElem = document.getElementById('album-location');
+            const dateElem = document.getElementById('album-date');
+            
+            if (album.location) {
+                locationElem.textContent = album.location;
+                locationElem.classList.remove('hidden');
+            } else {
+                locationElem.classList.add('hidden');
+            }
+            
+            if (album.date) {
+                const date = new Date(album.date);
+                const formattedDate = date.toLocaleDateString('zh-CN', {
+                    year: 'numeric',
+                    month: 'long'
+                });
+                dateElem.textContent = formattedDate;
+                dateElem.classList.remove('hidden');
+            } else {
+                dateElem.classList.add('hidden');
+            }
+            
+            let currentIndex = 0;
+            const totalImages = album.images.length;
+            
+            // 创建轮播图
+            const carouselContainer = document.getElementById('carousel-container');
+            carouselContainer.innerHTML = '';
+            
+            album.images.forEach((image, index) => {
+                const previewUrl = image.src + imageConfig.previewParams;
+                const fullImageUrl = image.src + imageConfig.fullImageParams;
+                
+                const slide = document.createElement('div');
+                slide.className = `carousel-slide ${index === 0 ? 'active' : ''}`;
+                slide.innerHTML = `
+                    <img 
+                        src="${previewUrl}" 
+                        data-full-src="${fullImageUrl}" 
+                        class="w-full h-full object-contain fade-in" 
+                        alt="${image.alt || ''}"
+                    >
+                `;
+                
+                carouselContainer.appendChild(slide);
+                
+                // 预加载图片
+                if (index === 0) {
+                    const img = slide.querySelector('img');
+                    preloadImage(fullImageUrl).then(() => {
+                        img.src = fullImageUrl;
+                        img.classList.add('loaded');
+                    }).catch(console.error);
+                }
+            });
+            
+            // 显示指定索引的图片
+            function showImage(index) {
+                if (index < 0 || index >= totalImages) return;
+                
+                // 更新当前索引
+                currentIndex = index;
+                
+                // 更新轮播图
+                const slides = document.querySelectorAll('.carousel-slide');
+                slides.forEach((slide, i) => {
+                    if (i === index) {
+                        slide.classList.add('active');
+                        
+                        // 加载高清图片
+                        const img = slide.querySelector('img');
+                        const fullImageUrl = img.getAttribute('data-full-src');
+                        
+                        if (!img.classList.contains('loaded')) {
+                            preloadImage(fullImageUrl).then(() => {
+                                img.src = fullImageUrl;
+                                img.classList.add('loaded');
+                            }).catch(console.error);
+                        }
+                        
+                        // 更新图片说明
+                        document.getElementById('image-caption').textContent = img.alt;
+                    } else {
+                        slide.classList.remove('active');
+                    }
+                });
+                
+                // 预加载下一张图片
+                if (index < totalImages - 1) {
+                    const nextImage = album.images[index + 1];
+                    addToPreloadQueue(nextImage.src + imageConfig.fullImageParams);
+                }
+                
+                // 更新缩略图状态
+                document.querySelectorAll('.thumbnail').forEach((thumb, i) => {
+                    if (i === index) {
+                        thumb.classList.add('active');
+                    } else {
+                        thumb.classList.remove('active');
+                    }
+                });
+            }
+            
+            // 全屏模式
+            const fullscreenOverlay = document.getElementById('fullscreen-overlay');
+            const fullscreenImage = document.getElementById('fullscreen-image');
+            const fullscreenCaption = document.getElementById('fullscreen-caption');
+            
+            // 开启全屏模式
+            function openFullscreen(index) {
+                const image = album.images[index];
+                const fullImageUrl = image.src + imageConfig.fullImageParams;
+                
+                fullscreenImage.src = fullImageUrl;
+                fullscreenImage.alt = '';  // 移除alt属性内容
+                // 不再显示底部说明文字
+                // fullscreenCaption.textContent = image.alt || '';
+                
+                fullscreenOverlay.classList.add('active');
+                document.body.style.overflow = 'hidden'; // 防止滚动
+            }
+            
+            // 关闭全屏模式
+            function closeFullscreen() {
+                fullscreenOverlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+            
+            // 全屏模式下切换图片
+            function showFullscreenImage(index) {
+                if (index < 0) index = totalImages - 1;
+                if (index >= totalImages) index = 0;
+                
+                currentIndex = index;
+                
+                const image = album.images[index];
+                const fullImageUrl = image.src + imageConfig.fullImageParams;
+                
+                fullscreenImage.classList.remove('loaded');
+                fullscreenImage.src = fullImageUrl;
+                fullscreenImage.alt = '';  // 移除alt属性内容
+                // 不再显示底部说明文字
+                // fullscreenCaption.textContent = image.alt || '';
+                
+                // 更新缩略图状态
+                document.querySelectorAll('.thumbnail').forEach((thumb, i) => {
+                    if (i === index) {
+                        thumb.classList.add('active');
+                    } else {
+                        thumb.classList.remove('active');
+                    }
+                });
+            }
+            
+            // 全屏模式事件监听
+            document.getElementById('fullscreen-btn').addEventListener('click', () => {
+                openFullscreen(currentIndex);
+            });
+            
+            document.getElementById('fullscreen-close').addEventListener('click', closeFullscreen);
+            
+            document.getElementById('fullscreen-prev').addEventListener('click', () => {
+                showFullscreenImage(currentIndex - 1);
+            });
+            
+            document.getElementById('fullscreen-next').addEventListener('click', () => {
+                showFullscreenImage(currentIndex + 1);
+            });
+            
+            // ESC键关闭全屏
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && fullscreenOverlay.classList.contains('active')) {
+                    closeFullscreen();
+                }
+            });
+            
+            // 生成缩略图导航
+            const thumbnailsContainer = document.getElementById('thumbnails');
+            thumbnailsContainer.innerHTML = '';
+            
+            album.images.forEach((image, index) => {
+                const thumbnailUrl = image.src + '?x-oss-process=image/resize,w_120,h_120,m_fill/quality,q_80';
+                const thumb = document.createElement('img');
+                thumb.src = thumbnailUrl;
+                thumb.alt = `缩略图 ${index + 1}`;
+                thumb.className = `thumbnail ${index === 0 ? 'active' : ''}`;
+                thumb.addEventListener('click', () => showImage(index));
+                thumbnailsContainer.appendChild(thumb);
+            });
+            
+            // 设置导航箭头事件
+            document.getElementById('prev-image').addEventListener('click', () => {
+                let prevIndex = currentIndex - 1;
+                if (prevIndex < 0) prevIndex = totalImages - 1; // 循环到最后一张
+                showImage(prevIndex);
+            });
+            
+            document.getElementById('next-image').addEventListener('click', () => {
+                let nextIndex = currentIndex + 1;
+                if (nextIndex >= totalImages) nextIndex = 0; // 循环到第一张
+                showImage(nextIndex);
+            });
+            
+            // 设置键盘导航
+            document.addEventListener('keydown', (e) => {
+                if (fullscreenOverlay.classList.contains('active')) {
+                    if (e.key === 'ArrowLeft') {
+                        showFullscreenImage(currentIndex - 1);
+                    } else if (e.key === 'ArrowRight') {
+                        showFullscreenImage(currentIndex + 1);
+                    }
+                } else {
+                    if (e.key === 'ArrowLeft') {
+                        let prevIndex = currentIndex - 1;
+                        if (prevIndex < 0) prevIndex = totalImages - 1;
+                        showImage(prevIndex);
+                    } else if (e.key === 'ArrowRight') {
+                        let nextIndex = currentIndex + 1;
+                        if (nextIndex >= totalImages) nextIndex = 0;
+                        showImage(nextIndex);
+                    }
+                }
+            });
+            
+            // 设置自动轮播
+            let slideshowTimer = null;
+            
+            function startSlideshow() {
+                if (slideshowTimer) clearInterval(slideshowTimer);
+                slideshowTimer = setInterval(() => {
+                    let nextIndex = (currentIndex + 1) % totalImages;
+                    showImage(nextIndex);
+                }, 5000);
+            }
+            
+            function resetSlideshowTimer() {
+                if (slideshowTimer) clearInterval(slideshowTimer);
+                startSlideshow();
+            }
+            
+            // 显示第一张图片并开始轮播
+            if (album.images.length > 0) {
+                showImage(0);
+                startSlideshow();
+                
+                // 当用户与页面交互时重置轮播计时器
+                document.addEventListener('mousemove', resetSlideshowTimer);
+                document.addEventListener('keydown', resetSlideshowTimer);
+                
+                // 点击全屏时暂停轮播
+                document.getElementById('fullscreen-btn').addEventListener('click', () => {
+                    if (slideshowTimer) clearInterval(slideshowTimer);
+                });
+                
+                // 关闭全屏时恢复轮播
+                document.getElementById('fullscreen-close').addEventListener('click', resetSlideshowTimer);
+            }
+        }
+
+        // 页面加载完成后获取专辑内容
+        document.addEventListener('DOMContentLoaded', fetchAndDisplayAlbum);
+    </script>
+</body>
+</html>
+
+

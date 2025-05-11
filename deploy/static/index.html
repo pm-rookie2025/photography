@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xingyan Gallery</title>
+    <link rel="icon" href="assets/images/光圈-copy.svg" type="image/svg+xml">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://at.alicdn.com/t/c/font_4902131_mf5n8tfonf.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            letter-spacing: 0.02em;
+        }
+        .series-item {
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        .series-item.active {
+            font-weight: bold;
+        }
+        .series-item.active::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 20px;
+            height: 1px;
+            background-color: #000;
+        }
+        .album-item:hover img {
+            opacity: 0.9;
+            transform: scale(1.02);
+            transition: all 0.3s ease;
+        }
+        .album-item img {
+            transition: all 0.3s ease;
+        }
+        .fade-in {
+            animation: fadeIn 0.8s ease-in-out forwards;
+            opacity: 0;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .loading-placeholder {
+            background: linear-gradient(90deg, #f0f0f0 25%, #f8f8f8 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        .image-container {
+            position: relative;
+            overflow: hidden;
+            background-color: #f5f5f5;
+        }
+        .loading-spinner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30px;
+            height: 30px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #000;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        .camera-icon {
+            /* height: 30px; */
+            /* width: auto; */
+            /* margin-right: 16px; */
+            /* vertical-align: middle; */
+        }
+        .site-title {
+            display: flex;
+            align-items: center;
+        }
+        .iconfont.icon-wodejiepai {
+            font-size: 30px;
+            margin-right: 12px;
+            color: currentColor;
+            line-height: 1;
+        }
+        .logo-text {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 30px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            line-height: 1;
+        }
+        /* 加载动画 */
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 300px;
+            width: 100%;
+            color: #666;
+            margin: 2rem 0;
+        }
+        .camera-loading {
+            position: relative;
+            width: 70px;
+            height: 45px;
+            margin-bottom: 24px;
+            animation: camera-float 2.5s infinite ease-in-out;
+        }
+        .camera-body {
+            width: 70px;
+            height: 45px;
+            background-color: #333;
+            border-radius: 6px;
+            position: relative;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .camera-lens {
+            width: 24px;
+            height: 24px;
+            background-color: #555;
+            border-radius: 50%;
+            position: absolute;
+            top: 10px;
+            left: 23px;
+            box-shadow: inset 0 0 0 3px rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .camera-button {
+            width: 12px;
+            height: 7px;
+            background-color: #888;
+            position: absolute;
+            top: 6px;
+            right: 10px;
+            border-radius: 2px;
+        }
+        .camera-flash {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-left: 18px solid transparent;
+            border-right: 18px solid transparent;
+            border-bottom: 35px solid rgba(255, 255, 255, 0.4);
+            top: -35px;
+            left: 18px;
+            opacity: 0;
+            transform-origin: bottom center;
+            animation: flash 2.5s infinite;
+            filter: drop-shadow(0 0 5px rgba(255,255,255,0.7));
+        }
+        @keyframes camera-float {
+            0%, 100% { transform: translateY(0) rotate(-2deg); }
+            50% { transform: translateY(-12px) rotate(2deg); }
+        }
+        @keyframes flash {
+            0%, 30%, 100% { opacity: 0; transform: scale(0.8); }
+            5%, 20% { opacity: 1; transform: scale(1.2); }
+        }
+    </style>
+</head>
+<body class="bg-white text-gray-800">
+    <div class="container mx-auto px-6 py-12 flex flex-col md:flex-row">
+        <!-- 左侧导航 -->
+        <div class="w-full md:w-1/4 pr-0 md:pr-12 mb-12 md:mb-0 md:sticky md:top-12 md:self-start">
+            <h1 class="text-2xl font-light uppercase tracking-widest mb-16 site-title flex items-center">
+                <i class="iconfont icon-wodejiepai"></i>
+                <span class="logo-text">XINGYAN</span>
+            </h1>
+            
+            <nav class="mb-16">
+                <ul class="space-y-5">
+                    <!-- 固定系列 -->
+                    <li><a href="#" class="series-item active text-lg" data-series="浮光半日·随拍">浮光半日·随拍</a></li>
+                    <li><a href="#" class="series-item text-lg" data-series="娜些时光">娜些时光</a></li>
+                    <li><a href="#" class="series-item text-lg" data-series="希希物语">希希物语</a></li>
+                </ul>
+            </nav>
+            
+            <div class="mt-auto">
+                <ul class="space-y-5">
+                    <li><a href="about.html" class="hover:underline text-lg">关于</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- 右侧内容区 -->
+        <div class="w-full md:w-3/4">
+            <div id="albums-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- 专辑将通过JavaScript动态加载 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API 基础URL - 自动根据当前环境确定
+        const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:3000/api'  // 本地开发环境
+            : `${window.location.origin}/api`;  // 生产环境
+        // 存储系列数据
+        let seriesData = {};
+
+        // 图片加载配置
+        const imageConfig = {
+            // 阿里云 OSS 配置
+            ossDomain: 'http://xingyan-photo.oss-cn-hangzhou.aliyuncs.com',
+            // 图片处理参数
+            thumbnailParams: '?x-oss-process=image/resize,w_300,m_lfit',
+            fullImageParams: '?x-oss-process=image/resize,w_1200,m_lfit',
+            // 预加载配置
+            preloadDistance: 100, // 预加载距离视口底部多少像素时开始加载
+            // 懒加载配置
+            lazyLoadThreshold: 0.1, // 图片进入视口多少比例时开始加载
+        };
+
+        // 获取所有系列数据
+        async function fetchAllSeries() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/series`);
+                if (!response.ok) throw new Error('Failed to fetch series');
+                
+                const series = await response.json();
+                
+                // 更新左侧导航
+                updateSeriesNavigation(series);
+                
+                // 如果有系列，默认显示第一个
+                if (series.length > 0) {
+                    fetchAlbumsBySeries(series[0].id);
+                }
+            } catch (error) {
+                console.error('Error fetching series:', error);
+                // 可以添加错误提示UI
+            }
+        }
+
+        // 更新系列导航
+        function updateSeriesNavigation(series) {
+            const nav = document.querySelector('nav ul');
+            nav.innerHTML = '';
+            
+            series.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.innerHTML = `<a href="#" class="series-item ${index === 0 ? 'active' : ''} text-lg" data-series="${item.id}">${item.name}</a>`;
+                nav.appendChild(li);
+            });
+            
+            // 添加事件监听
+            document.querySelectorAll('.series-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // 更新激活状态
+                    document.querySelectorAll('.series-item').forEach(i => i.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // 获取并显示对应系列的专辑
+                    const seriesId = this.getAttribute('data-series');
+                    fetchAlbumsBySeries(seriesId);
+                });
+            });
+        }
+
+        // 获取特定系列的专辑
+        async function fetchAlbumsBySeries(seriesId) {
+            // 显示加载中状态
+            const albumsContainer = document.getElementById('albums-container');
+            albumsContainer.innerHTML = `
+                <div class="col-span-full flex justify-center items-center">
+                    <div class="loading-container">
+                        <div class="camera-loading">
+                            <div class="camera-body">
+                                <div class="camera-lens"></div>
+                                <div class="camera-button"></div>
+                                <div class="camera-flash"></div>
+                            </div>
+                        </div>
+                        <p class="text-sm font-light mt-4 tracking-wide text-gray-500">加载精彩瞬间...</p>
+                    </div>
+                </div>
+            `;
+            
+            try {
+                console.log(`请求系列的专辑: ${seriesId}`);
+                console.log(`使用API URL: ${API_BASE_URL}/series/${seriesId}/albums`);
+                
+                const response = await fetch(`${API_BASE_URL}/series/${seriesId}/albums`);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`加载失败 (${response.status}): ${errorText || response.statusText}`);
+                }
+                
+                const albums = await response.json();
+                // 存储数据以供后续使用
+                seriesData[seriesId] = albums;
+                
+                // 显示专辑
+                displayAlbums(albums);
+            } catch (error) {
+                console.error('Error fetching albums:', error);
+                // 显示详细错误提示
+                albumsContainer.innerHTML = `
+                    <div class="col-span-full text-center py-20">
+                        <p class="text-red-500 mb-2">加载失败</p>
+                        <p class="text-gray-500 text-sm">${error.message}</p>
+                        <p class="text-gray-500 text-sm mt-3">API URL: ${API_BASE_URL}</p>
+                        <button class="mt-4 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300" onclick="fetchAlbumsBySeries('${seriesId}')">重试</button>
+                    </div>
+                `;
+            }
+        }
+
+        // 预加载图片
+        function preloadImage(url) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(url);
+                img.onerror = () => reject(url);
+                img.src = url;
+            });
+        }
+
+        // 显示专辑
+        function displayAlbums(albums) {
+            const albumsContainer = document.getElementById('albums-container');
+            albumsContainer.innerHTML = '';
+            
+            if (albums.length === 0) {
+                albumsContainer.innerHTML = `
+                    <div class="col-span-full text-center py-20 text-gray-500">
+                        没有找到专辑
+                    </div>
+                `;
+                return;
+            }
+            
+            albums.forEach((album, index) => {
+                const albumElement = document.createElement('div');
+                albumElement.className = 'album-item fade-in';
+                albumElement.style.animationDelay = `${index * 0.1}s`;
+                
+                // 创建加载占位符
+                albumElement.innerHTML = `
+                    <a href="album.html?id=${album.id}" class="block">
+                        <div class="image-container w-full h-72 relative">
+                            <div class="loading-placeholder absolute inset-0"></div>
+                            <img 
+                                data-src="${album.coverUrl || album.cover}"
+                                data-full-src="${album.coverUrl || album.cover}"
+                                alt="${album.title}" 
+                                class="w-full h-72 object-cover opacity-0 transition-opacity duration-300"
+                                loading="lazy"
+                            >
+                        </div>
+                        <h3 class="mt-3 mb-1 text-base font-light uppercase tracking-wider">${album.title}</h3>
+                        <div class="text-base text-gray-500 flex items-center gap-2">
+                            ${album.location ? `<p class="font-light">${album.location}</p>` : ''}
+                            ${album.location && album.date ? `<span class="font-light">·</span>` : ''}
+                            ${album.date ? `<p class="font-light">${new Date(album.date).toLocaleDateString('zh-CN', {year: 'numeric', month: 'long'})}</p>` : ''}
+                        </div>
+                    </a>
+                `;
+                
+                albumsContainer.appendChild(albumElement);
+                
+                // 预加载图片
+                if (album.coverUrl || album.cover) {
+                    const imgUrl = album.coverUrl || album.cover;
+                    preloadImage(imgUrl)
+                        .then(() => {
+                            const img = albumElement.querySelector('img');
+                            img.src = imgUrl;
+                            img.classList.remove('opacity-0');
+                            const placeholder = albumElement.querySelector('.loading-placeholder');
+                            if (placeholder) placeholder.remove();
+                        })
+                        .catch(() => {
+                            console.error('Failed to load image:', imgUrl);
+                        });
+                }
+            });
+        }
+
+        // 懒加载处理
+        function loadImages() {
+            const images = document.querySelectorAll('img[data-src]');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        const src = img.dataset.src;
+                        const fullSrc = img.dataset.fullSrc;
+                        
+                        // 加载缩略图
+                        img.src = src + imageConfig.thumbnailParams;
+                        
+                        // 预加载原图
+                        if (fullSrc) {
+                            preloadImage(fullSrc + imageConfig.fullImageParams)
+                                .then(() => {
+                                    img.src = fullSrc + imageConfig.fullImageParams;
+                                })
+                                .catch(console.error);
+                        }
+                        
+                        img.removeAttribute('data-src');
+                        img.removeAttribute('data-full-src');
+                        observer.unobserve(img);
+                    }
+                });
+            }, {
+                rootMargin: '50px 0px',
+                threshold: imageConfig.lazyLoadThreshold
+            });
+
+            images.forEach(img => observer.observe(img));
+        }
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadImages();
+            // 不再调用fetchAllSeries()，而是直接加载第一个系列
+            fetchAlbumsBySeries('浮光半日·随拍');
+            
+            // 为固定系列添加点击事件
+            document.querySelectorAll('.series-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // 更新激活状态
+                    document.querySelectorAll('.series-item').forEach(i => i.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // 获取并显示对应系列的专辑
+                    const seriesId = this.getAttribute('data-series');
+                    fetchAlbumsBySeries(seriesId);
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -28,6 +28,25 @@
             padding-bottom: 2rem;
         }
         
+        /* 加载状态 */
+        body.loading:before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background-color: #000;
+            animation: loading-progress 2s ease-in-out infinite;
+            z-index: 9999;
+        }
+        
+        @keyframes loading-progress {
+            0% { width: 0; }
+            50% { width: 70%; }
+            100% { width: 100%; }
+        }
+        
         /* 主要内容区域 */
         .main-content {
             max-width: 900px;
@@ -74,38 +93,91 @@
         
         .thumbnail-nav {
             display: flex;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            scrollbar-width: thin;
+            -webkit-overflow-scrolling: touch;
             gap: 6px;
+            padding: 4px 0;
             margin-top: 1rem;
             margin-bottom: 1rem;
-            justify-content: center;
+            justify-content: flex-start;
+            align-items: center;
+            max-width: 100%;
+            scroll-behavior: smooth;
+            /* 防止页面滚动时改变高度 */
+            min-height: 64px;
+            /* 隐藏滚动条但保留功能 */
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE and Edge */
+        }
+        
+        /* 隐藏Webkit浏览器的滚动条 */
+        .thumbnail-nav::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .thumbnail-container {
+            flex: 0 0 auto;
+            width: 56px;
+            height: 56px;
+            position: relative;
+            border-radius: 3px;
+            overflow: hidden;
+            background-color: #f5f5f5;
+        }
+        
+        .thumbnail-skeleton {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #f0f0f0 0%, #f8f8f8 50%, #f0f0f0 100%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite linear;
+            z-index: 1;
+            transition: opacity 0.3s ease;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
         }
         
         .thumbnail {
-            width: 48px;
-            height: 48px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             object-fit: cover;
-            cursor: pointer;
-            opacity: 0.7;
-            transition: all 0.2s ease;
-            border: 1px solid transparent;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            z-index: 2;
         }
         
-        @media (min-width: 640px) {
-            .thumbnail {
-                width: 56px;
-                height: 56px;
-            }
+        .thumbnail.loaded {
+            opacity: 0.7;
+        }
+        
+        .thumbnail.active.loaded {
+            opacity: 1;
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
         }
         
         .thumbnail:hover {
             opacity: 1;
         }
         
-        .thumbnail.active {
-            opacity: 1;
-            border: 1px solid transparent;
-            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+        .loading-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 2px;
+            background-color: #000;
+            transition: width 0.3s ease-out, opacity 0.5s ease;
+            z-index: 1000;
         }
         
         .camera-icon {
@@ -373,46 +445,6 @@
             display: none; /* 隐藏全屏模式下的图片说明 */
         }
         
-        /* 缩略图加载样式优化 */
-        .thumbnail-skeleton {
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(110deg, #ececec 8%, #f5f5f5 18%, #ececec 33%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s linear infinite;
-            border-radius: 2px;
-        }
-        
-        @keyframes shimmer {
-            0% { background-position: 100% 0; }
-            100% { background-position: -100% 0; }
-        }
-        
-        .thumbnail-container {
-            width: 56px;
-            height: 56px;
-            position: relative;
-            margin: 0 3px;
-            display: inline-block;
-            border-radius: 2px;
-            overflow: hidden;
-        }
-        
-        .thumbnail {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            opacity: 0;
-            transition: opacity 0.4s ease;
-            object-fit: cover;
-        }
-        
-        .thumbnail.thumb-loaded {
-            opacity: 1;
-        }
-        
         /* 主图加载动画 */
         .main-image-loader {
             position: absolute;
@@ -450,6 +482,10 @@
         /* 图片加载效果优化 */
         .carousel-slide img {
             opacity: 0;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            object-position: center;
             transition: opacity 0.8s ease;
             transform: scale(0.98);
             transition: opacity 0.8s ease, transform 0.6s ease;
@@ -458,6 +494,14 @@
         .carousel-slide img.loaded {
             opacity: 1;
             transform: scale(1);
+        }
+        
+        .main-image-container .carousel-slide {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
         }
         
         /* 专辑载入效果 */
@@ -470,6 +514,24 @@
         .album-content.loaded {
             opacity: 1;
             transform: translateY(0);
+        }
+        
+        .image-error-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.2rem;
+            color: #888;
+            z-index: 3;
+        }
+        
+        .image-error + .image-error-indicator {
+            display: block;
+        }
+        
+        .main-image-container .image-error {
+            opacity: 0.4;
         }
         
     </style>
@@ -567,10 +629,36 @@
         // 图片配置
         const imageConfig = {
             ossDomain: 'http://xingyan-photo.oss-cn-hangzhou.aliyuncs.com',
-            thumbnailParams: '?x-oss-process=image/resize,w_400,h_400,m_fill/quality,q_80',
+            thumbnailParams: '?x-oss-process=image/resize,w_100,h_100,m_fill/quality,q_60',
             fullImageParams: '?x-oss-process=image/resize,w_1920,m_lfit/quality,q_90',
-            previewParams: '?x-oss-process=image/resize,w_800,m_lfit/quality,q_85'
+            previewParams: '?x-oss-process=image/resize,w_600,m_lfit/quality,q_75'  // 降低预览图质量和尺寸
         };
+
+        // 全局错误处理
+        window.addEventListener('error', function(e) {
+            // 只捕获图片加载错误，避免影响其他功能
+            if (e.target.tagName === 'IMG') {
+                console.warn('图片加载失败:', e.target.src);
+                // 防止错误传播影响页面功能
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // 为加载失败的图片添加错误类
+                e.target.classList.add('image-error');
+                
+                // 如果是缩略图，使用备用样式
+                if (e.target.classList.contains('thumbnail')) {
+                    const container = e.target.closest('.thumbnail-container');
+                    if (container) {
+                        const placeholder = container.querySelector('.thumbnail-skeleton');
+                        if (placeholder) {
+                            placeholder.style.backgroundColor = '#f0f0f0';
+                            placeholder.style.animation = 'none';
+                        }
+                    }
+                }
+            }
+        }, true);
 
         // API 基础URL
         const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -583,35 +671,7 @@
             return urlParams.get(param);
         }
 
-        // 预加载队列
-        const preloadQueue = [];
-        let isPreloading = false;
-
-        // 添加到预加载队列
-        function addToPreloadQueue(url) {
-            if (!preloadQueue.includes(url)) {
-                preloadQueue.push(url);
-                startPreloading();
-            }
-        }
-
-        // 开始预加载
-        async function startPreloading() {
-            if (isPreloading || preloadQueue.length === 0) return;
-            
-            isPreloading = true;
-            while (preloadQueue.length > 0) {
-                const url = preloadQueue.shift();
-                try {
-                    await preloadImage(url);
-                } catch (error) {
-                    console.error('预加载图片失败:', error);
-                }
-            }
-            isPreloading = false;
-        }
-
-        // 预加载图片
+        // 简化的图片预加载函数
         function preloadImage(url) {
             return new Promise((resolve, reject) => {
                 const img = new Image();
@@ -630,6 +690,9 @@
             }
             
             try {
+                // 显示加载状态
+                document.body.classList.add('loading');
+                
                 const response = await fetch(`${API_BASE_URL}/albums/${albumId}`);
                 if (!response.ok) throw new Error('Failed to fetch album details');
                 
@@ -637,6 +700,9 @@
                 displayAlbum(album);
             } catch (error) {
                 console.error('Error fetching album details:', error);
+                alert('加载专辑内容失败，请刷新页面重试');
+            } finally {
+                document.body.classList.remove('loading');
             }
         }
 
@@ -693,77 +759,70 @@
                 
                 carouselContainer.appendChild(slide);
                 
-                // 预加载第一张图片
+                // 只预加载第一张图片
                 if (index === 0) {
                     const img = slide.querySelector('img');
-                    preloadImage(fullImageUrl).then(() => {
-                        img.src = fullImageUrl;
+                    img.onload = function() {
                         img.classList.add('loaded');
-                        // 隐藏加载动画
                         document.getElementById('main-image-loader').classList.add('hidden');
-                    }).catch(console.error);
+                    };
                 }
             });
             
-            // 显示指定索引的图片
-            function showImage(index) {
-                if (index < 0 || index >= totalImages) return;
+            // ===== 简化版缩略图加载 =====
+            const thumbnailsContainer = document.getElementById('thumbnails');
+            thumbnailsContainer.innerHTML = '';
+            
+            // 一次创建所有缩略图
+            album.images.forEach((image, index) => {
+                const container = document.createElement('div');
+                container.className = 'thumbnail-container';
+                container.dataset.index = index;
                 
-                // 显示加载动画
-                document.getElementById('main-image-loader').classList.remove('hidden');
+                // 占位符
+                const placeholder = document.createElement('div');
+                placeholder.className = 'thumbnail-skeleton';
+                container.appendChild(placeholder);
                 
-                // 更新当前索引
-                currentIndex = index;
+                // 缩略图（使用更小的缩略图尺寸）
+                const thumbUrl = image.src + imageConfig.thumbnailParams;
+                const thumb = document.createElement('img');
+                thumb.className = `thumbnail ${index === 0 ? 'active' : ''}`;
+                thumb.alt = '';  // 移除alt以减少内存使用
                 
-                // 更新轮播图
-                const slides = document.querySelectorAll('.carousel-slide');
-                slides.forEach((slide, i) => {
-                    if (i === index) {
-                        slide.classList.add('active');
-                        
-                        // 加载高清图片
-                        const img = slide.querySelector('img');
-                        const fullImageUrl = img.getAttribute('data-full-src');
-                        
-                        if (!img.classList.contains('loaded')) {
-                            preloadImage(fullImageUrl).then(() => {
-                                img.src = fullImageUrl;
-                                img.classList.add('loaded');
-                                // 隐藏加载动画
-                                document.getElementById('main-image-loader').classList.add('hidden');
-                            }).catch(console.error);
-                        } else {
-                            // 如果图片已经加载过，直接隐藏加载动画
-                            document.getElementById('main-image-loader').classList.add('hidden');
-                        }
-                        
-                        // 更新图片说明
-                        document.getElementById('image-caption').textContent = img.alt;
-                    } else {
-                        slide.classList.remove('active');
-                    }
-                });
+                // 简化的加载处理
+                thumb.onload = function() {
+                    thumb.classList.add('loaded');
+                    placeholder.style.opacity = '0';
+                };
                 
-                // 预加载下一张图片
-                if (index < totalImages - 1) {
-                    const nextImage = album.images[index + 1];
-                    addToPreloadQueue(nextImage.src + imageConfig.fullImageParams);
+                thumb.onerror = function() {
+                    placeholder.style.backgroundColor = '#f8f8f8';
+                    placeholder.style.animation = 'none';
+                };
+                
+                // 只对首屏可见的缩略图设置src（首8个）
+                if (index < 8) {
+                    thumb.src = thumbUrl;
+                } else {
+                    // 使用IntersectionObserver延迟加载其他缩略图
+                    setTimeout(() => {
+                        thumb.src = thumbUrl;
+                    }, 100 * (index - 7)); // 错开加载时间，避免同时请求
                 }
                 
-                // 更新缩略图状态
-                document.querySelectorAll('.thumbnail').forEach((thumb, i) => {
-                    if (i === index) {
-                        thumb.classList.add('active');
-                    } else {
-                        thumb.classList.remove('active');
-                    }
+                // 点击事件
+                thumb.addEventListener('click', () => {
+                    showImage(index);
                 });
-            }
+                
+                container.appendChild(thumb);
+                thumbnailsContainer.appendChild(container);
+            });
             
-            // 全屏模式
+            // 全屏模式代码保持不变
             const fullscreenOverlay = document.getElementById('fullscreen-overlay');
             const fullscreenImage = document.getElementById('fullscreen-image');
-            const fullscreenCaption = document.getElementById('fullscreen-caption');
             
             // 开启全屏模式
             function openFullscreen(index) {
@@ -771,12 +830,9 @@
                 const fullImageUrl = image.src + imageConfig.fullImageParams;
                 
                 fullscreenImage.src = fullImageUrl;
-                fullscreenImage.alt = '';  // 移除alt属性内容
-                // 不再显示底部说明文字
-                // fullscreenCaption.textContent = image.alt || '';
-                
+                fullscreenImage.alt = '';
                 fullscreenOverlay.classList.add('active');
-                document.body.style.overflow = 'hidden'; // 防止滚动
+                document.body.style.overflow = 'hidden';
             }
             
             // 关闭全屏模式
@@ -795,23 +851,46 @@
                 const image = album.images[index];
                 const fullImageUrl = image.src + imageConfig.fullImageParams;
                 
-                fullscreenImage.classList.remove('loaded');
                 fullscreenImage.src = fullImageUrl;
-                fullscreenImage.alt = '';  // 移除alt属性内容
-                // 不再显示底部说明文字
-                // fullscreenCaption.textContent = image.alt || '';
+                fullscreenImage.alt = '';
                 
                 // 更新缩略图状态
-                document.querySelectorAll('.thumbnail').forEach((thumb, i) => {
-                    if (i === index) {
-                        thumb.classList.add('active');
-                    } else {
-                        thumb.classList.remove('active');
-                    }
-                });
+                scrollToThumbnail(index);
             }
             
-            // 全屏模式事件监听
+            // 简化的滚动到缩略图函数
+            function scrollToThumbnail(index) {
+                // 重置所有缩略图状态
+                document.querySelectorAll('.thumbnail').forEach(thumb => {
+                    thumb.classList.remove('active');
+                });
+                
+                // 设置当前缩略图为活动状态
+                const container = document.querySelector(`.thumbnail-container[data-index="${index}"]`);
+                if (container) {
+                    const thumb = container.querySelector('.thumbnail');
+                    thumb.classList.add('active');
+                    
+                    // 获取缩略图容器
+                    const thumbnailsNav = document.getElementById('thumbnails');
+                    if (thumbnailsNav) {
+                        // 只滚动缩略图容器，不滚动整个页面
+                        const scrollLeft = container.offsetLeft - (thumbnailsNav.offsetWidth / 2) + (container.offsetWidth / 2);
+                        thumbnailsNav.scrollTo({
+                            left: scrollLeft,
+                            behavior: 'smooth'
+                        });
+                    }
+                    
+                    // 如果缩略图未加载，加载它
+                    if (!thumb.src) {
+                        const image = album.images[index];
+                        thumb.src = image.src + imageConfig.thumbnailParams;
+                    }
+                }
+            }
+            
+            // 全屏按钮事件
             document.getElementById('fullscreen-btn').addEventListener('click', () => {
                 openFullscreen(currentIndex);
             });
@@ -833,144 +912,60 @@
                 }
             });
             
-            // 生成缩略图导航
-            const thumbnailsContainer = document.getElementById('thumbnails');
-            thumbnailsContainer.innerHTML = '';
-            
-            // 预加载缩略图的函数
-            function preloadThumbnails(images) {
-                return new Promise((resolve) => {
-                    const totalThumbs = images.length;
-                    let loadedCount = 0;
-                    const preloadedThumbs = new Array(totalThumbs).fill(null);
-                    
-                    images.forEach((image, index) => {
-                        const thumbnailUrl = image.src + '?x-oss-process=image/resize,w_120,h_120,m_fill/quality,q_80';
-                        const img = new Image();
+            // 简化的显示图片函数
+            function showImage(index) {
+                if (index < 0 || index >= totalImages) return;
+                
+                // 显示加载动画
+                document.getElementById('main-image-loader').classList.remove('hidden');
+                
+                // 更新当前索引
+                currentIndex = index;
+                
+                // 更新轮播图
+                document.querySelectorAll('.carousel-slide').forEach((slide, i) => {
+                    if (i === index) {
+                        slide.classList.add('active');
                         
-                        img.onload = () => {
-                            preloadedThumbs[index] = {
-                                url: thumbnailUrl,
-                                loaded: true
+                        // 加载高清图片
+                        const img = slide.querySelector('img');
+                        const fullImageUrl = img.getAttribute('data-full-src');
+                        
+                        if (!img.classList.contains('loaded')) {
+                            img.onload = function() {
+                                img.classList.add('loaded');
+                                document.getElementById('main-image-loader').classList.add('hidden');
                             };
-                            
-                            loadedCount++;
-                            if (loadedCount === totalThumbs) {
-                                resolve(preloadedThumbs);
-                            }
-                        };
-                        
-                        img.onerror = () => {
-                            preloadedThumbs[index] = {
-                                url: thumbnailUrl,
-                                loaded: false
-                            };
-                            
-                            loadedCount++;
-                            if (loadedCount === totalThumbs) {
-                                resolve(preloadedThumbs);
-                            }
-                        };
-                        
-                        img.src = thumbnailUrl;
-                    });
-                    
-                    // 如果5秒内没有全部加载完，也返回结果
-                    setTimeout(() => {
-                        if (loadedCount < totalThumbs) {
-                            resolve(preloadedThumbs);
+                            img.src = fullImageUrl;
+                        } else {
+                            document.getElementById('main-image-loader').classList.add('hidden');
                         }
-                    }, 5000);
-                });
-            }
-            
-            // 创建所有缩略图占位元素
-            album.images.forEach((image, index) => {
-                const container = document.createElement('div');
-                container.className = 'thumbnail-container';
-                container.dataset.index = index;
-                
-                // 创建占位元素
-                const placeholder = document.createElement('div');
-                placeholder.className = 'thumbnail-skeleton';
-                container.appendChild(placeholder);
-                
-                // 创建缩略图元素（暂不设置src）
-                const thumb = document.createElement('img');
-                thumb.alt = `缩略图 ${index + 1}`;
-                thumb.className = `thumbnail ${index === 0 ? 'active' : ''}`;
-                thumb.dataset.index = index;
-                thumb.addEventListener('click', () => showImage(index));
-                container.appendChild(thumb);
-                
-                thumbnailsContainer.appendChild(container);
-            });
-            
-            // 预加载并显示缩略图
-            preloadThumbnails(album.images).then(preloadedThumbs => {
-                // 按顺序显示缩略图
-                preloadedThumbs.forEach((thumb, index) => {
-                    if (thumb && thumb.loaded) {
-                        const container = thumbnailsContainer.querySelector(`.thumbnail-container[data-index="${index}"]`);
-                        if (container) {
-                            const imgElement = container.querySelector('.thumbnail');
-                            const placeholder = container.querySelector('.thumbnail-skeleton');
-                            
-                            // 设置图片src并添加加载完成的类
-                            imgElement.src = thumb.url;
-                            
-                            // 图片加载完成后添加类和移除占位符
-                            imgElement.onload = () => {
-                                imgElement.classList.add('thumb-loaded');
-                                if (placeholder) {
-                                    placeholder.style.display = 'none';
-                                }
-                            };
-                        }
+                        
+                        // 更新图片说明
+                        document.getElementById('image-caption').textContent = img.alt;
+                    } else {
+                        slide.classList.remove('active');
                     }
                 });
                 
-                // 所有缩略图加载完成后，显示整个专辑内容
-                setTimeout(() => {
-                    document.getElementById('album-content').classList.add('loaded');
-                }, 300);
-            });
+                // 滚动到对应缩略图并更新状态
+                scrollToThumbnail(index);
+            }
             
             // 设置导航箭头事件
             document.getElementById('prev-image').addEventListener('click', () => {
                 let prevIndex = currentIndex - 1;
-                if (prevIndex < 0) prevIndex = totalImages - 1; // 循环到最后一张
+                if (prevIndex < 0) prevIndex = totalImages - 1;
                 showImage(prevIndex);
             });
             
             document.getElementById('next-image').addEventListener('click', () => {
                 let nextIndex = currentIndex + 1;
-                if (nextIndex >= totalImages) nextIndex = 0; // 循环到第一张
+                if (nextIndex >= totalImages) nextIndex = 0;
                 showImage(nextIndex);
             });
             
-            // 设置键盘导航
-            document.addEventListener('keydown', (e) => {
-                if (fullscreenOverlay.classList.contains('active')) {
-                    if (e.key === 'ArrowLeft') {
-                        showFullscreenImage(currentIndex - 1);
-                    } else if (e.key === 'ArrowRight') {
-                        showFullscreenImage(currentIndex + 1);
-                    }
-                } else {
-                    if (e.key === 'ArrowLeft') {
-                        let prevIndex = currentIndex - 1;
-                        if (prevIndex < 0) prevIndex = totalImages - 1;
-                        showImage(prevIndex);
-                    } else if (e.key === 'ArrowRight') {
-                        let nextIndex = currentIndex + 1;
-                        if (nextIndex >= totalImages) nextIndex = 0;
-                        showImage(nextIndex);
-                    }
-                }
-            });
-            
-            // 设置自动轮播
+            // 简化版自动轮播
             let slideshowTimer = null;
             
             function startSlideshow() {
@@ -981,6 +976,7 @@
                 }, 5000);
             }
             
+            // 用户交互时重置轮播计时器
             function resetSlideshowTimer() {
                 if (slideshowTimer) clearInterval(slideshowTimer);
                 startSlideshow();
@@ -988,19 +984,16 @@
             
             // 显示第一张图片并开始轮播
             if (album.images.length > 0) {
+                document.getElementById('album-content').classList.add('loaded');
                 showImage(0);
                 startSlideshow();
                 
-                // 当用户与页面交互时重置轮播计时器
-                document.addEventListener('mousemove', resetSlideshowTimer);
-                document.addEventListener('keydown', resetSlideshowTimer);
-                
-                // 点击全屏时暂停轮播
+                // 交互事件监听
+                document.getElementById('prev-image').addEventListener('click', resetSlideshowTimer);
+                document.getElementById('next-image').addEventListener('click', resetSlideshowTimer);
                 document.getElementById('fullscreen-btn').addEventListener('click', () => {
                     if (slideshowTimer) clearInterval(slideshowTimer);
                 });
-                
-                // 关闭全屏时恢复轮播
                 document.getElementById('fullscreen-close').addEventListener('click', resetSlideshowTimer);
             }
         }

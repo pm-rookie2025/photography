@@ -50,53 +50,77 @@ async function getAllSeriesAndAlbums() {
   try {
     console.log('开始获取全部摄影系列和专辑...');
     
-    const response = await notion.databases.query({
-      database_id: CONFIG.notionDatabaseId,
-    });
-    
-    // 提取所有摄影集并组织数据
+    // 创建一个Map来存储系列和专辑数据
     const seriesMap = new Map();
     
-    for (const page of response.results) {
-      const seriesProperty = page.properties.摄影集?.select;
-      const seriesName = seriesProperty?.name || '未分类';
-      // 使用系列名作为目录名，替换非法字符
-      const seriesId = seriesName.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+    // 使用分页查询获取所有记录
+    let hasMore = true;
+    let startCursor = undefined;
+    let totalPages = 0;
+    let totalRecords = 0;
+    
+    while (hasMore) {
+      totalPages++;
+      console.log(`正在获取第 ${totalPages} 页数据...`);
       
-      if (!seriesMap.has(seriesId)) {
-        seriesMap.set(seriesId, {
-          id: seriesId,
-          name: seriesName,
-          albums: []
+      const response = await notion.databases.query({
+        database_id: CONFIG.notionDatabaseId,
+        start_cursor: startCursor,
+        page_size: 100, // 每页获取最大数量的记录
+      });
+      
+      totalRecords += response.results.length;
+      console.log(`本页获取到 ${response.results.length} 条记录`);
+      
+      // 处理本页的所有记录
+      for (const page of response.results) {
+        const seriesProperty = page.properties.摄影集?.select;
+        const seriesName = seriesProperty?.name || '未分类';
+        // 使用系列名作为目录名，替换非法字符
+        const seriesId = seriesName.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+        
+        if (!seriesMap.has(seriesId)) {
+          seriesMap.set(seriesId, {
+            id: seriesId,
+            name: seriesName,
+            albums: []
+          });
+        }
+        
+        // 获取专辑信息
+        const albumId = page.id;
+        const albumTitle = page.properties['相册']?.title[0]?.text.content || '未命名相册';
+        // 使用专辑标题作为目录名，替换非法字符
+        const albumDirName = albumTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+        const location = page.properties['地点']?.rich_text[0]?.text.content || '';
+        const date = page.properties['拍摄日期']?.date?.start || '';
+        
+        // 获取封面图片URL
+        let coverUrl = '';
+        const coverProperty = page.properties['封面'];
+        if (coverProperty && coverProperty.files && coverProperty.files.length > 0) {
+          coverUrl = coverProperty.files[0].file?.url || coverProperty.files[0].external?.url || '';
+        }
+        
+        // 将专辑添加到对应的系列中
+        seriesMap.get(seriesId).albums.push({
+          id: albumId,
+          title: albumTitle,
+          dirName: albumDirName,
+          location: location,
+          date: date,
+          cover: coverUrl,
+          images: [] // 图片集会在后面获取
         });
       }
       
-      // 获取专辑信息
-      const albumId = page.id;
-      const albumTitle = page.properties['相册']?.title[0]?.text.content || '未命名相册';
-      // 使用专辑标题作为目录名，替换非法字符
-      const albumDirName = albumTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
-      const location = page.properties['地点']?.rich_text[0]?.text.content || '';
-      const date = page.properties['拍摄日期']?.date?.start || '';
-      
-      // 获取封面图片URL
-      let coverUrl = '';
-      const coverProperty = page.properties['封面'];
-      if (coverProperty && coverProperty.files && coverProperty.files.length > 0) {
-        coverUrl = coverProperty.files[0].file?.url || coverProperty.files[0].external?.url || '';
-      }
-      
-      // 将专辑添加到对应的系列中
-      seriesMap.get(seriesId).albums.push({
-        id: albumId,
-        title: albumTitle,
-        dirName: albumDirName,
-        location: location,
-        date: date,
-        cover: coverUrl,
-        images: [] // 图片集会在后面获取
-      });
+      // 检查是否有更多页面需要获取
+      hasMore = response.has_more;
+      startCursor = response.next_cursor;
     }
+    
+    console.log(`总共获取了 ${totalPages} 页数据，共 ${totalRecords} 条记录`);
+    console.log(`找到 ${seriesMap.size} 个系列，共 ${totalRecords} 个专辑`);
     
     // 转换为数组格式
     return Array.from(seriesMap.values());
@@ -391,19 +415,24 @@ async function processImage(imageUrl, outputPath, tempPath) {
         
         if (ext === '.jpg' || ext === '.jpeg') {
           processedImage = await sharp(tempPath)
+            .rotate() // 自动根据EXIF信息旋转图片
             .jpeg({ quality: CONFIG.compressionQuality })
             .toBuffer();
         } else if (ext === '.png') {
           processedImage = await sharp(tempPath)
+            .rotate() // 自动根据EXIF信息旋转图片
             .png({ quality: CONFIG.compressionQuality })
             .toBuffer();
         } else if (ext === '.webp') {
           processedImage = await sharp(tempPath)
+            .rotate() // 自动根据EXIF信息旋转图片
             .webp({ quality: CONFIG.compressionQuality })
             .toBuffer();
         } else {
-          // 对于其他格式，保持原样
-          processedImage = await sharp(tempPath).toBuffer();
+          // 对于其他格式，保持原样但仍旋转
+          processedImage = await sharp(tempPath)
+            .rotate() // 自动根据EXIF信息旋转图片
+            .toBuffer();
         }
         
         compressionBar.update(70); // 更新进度为70%
@@ -529,328 +558,154 @@ async function processImage(imageUrl, outputPath, tempPath) {
 
 // 主函数
 async function main() {
+  console.log(colors.cyan('📷 开始同步Notion相册图片...'));
+  const startTime = Date.now();
+
+  // 解析命令行参数
+  const args = process.argv.slice(2);
+  const albumPageIdArg = args.find(arg => arg.startsWith('--albumPageId='));
+  const specificAlbumPageId = albumPageIdArg ? albumPageIdArg.split('=')[1] : null;
+
   try {
-    console.log('=== 开始下载和组织Notion图片 ===');
-    
-    if (CONFIG.useOSS) {
-      console.log(`使用阿里云OSS存储图片，Bucket: ${process.env.OSS_BUCKET}，前缀路径: ${CONFIG.ossPrefix}`);
-    }
-    
-    // 创建基础目录
     await createDirectory(CONFIG.baseDir);
-    await createDirectory(path.dirname(CONFIG.outputJsonPath));
-    const tempDir = path.join(CONFIG.baseDir, '_temp');
-    await createDirectory(tempDir);
-    
-    // 统计信息
-    const stats = {
-      totalProcessedAlbums: 0,
-      totalSkippedAlbums: 0,
-      totalProcessedImages: 0,
-      totalSkippedImages: 0,
-      totalOriginalSize: 0,
-      totalCompressedSize: 0,
-      startTime: Date.now()
-    };
-    
-    // 读取已处理图片记录
-    let processedImages = {};
-    let existingData = null;
-    
-    if (CONFIG.incrementalUpdate) {
-      // 尝试读取已处理图片记录
-      try {
-        if (fs.existsSync(CONFIG.imageRecordPath)) {
-          processedImages = JSON.parse(fs.readFileSync(CONFIG.imageRecordPath, 'utf8'));
-          console.log(`已加载处理记录，共 ${Object.keys(processedImages).length} 张图片`);
-        } else {
-          console.log('未找到已处理图片记录，将创建新记录');
-        }
-      } catch (error) {
-        console.warn('读取已处理图片记录失败:', error);
-        processedImages = {};
-      }
-      
-      // 尝试读取现有的专辑数据
-      try {
-        if (fs.existsSync(CONFIG.outputJsonPath)) {
-          existingData = JSON.parse(fs.readFileSync(CONFIG.outputJsonPath, 'utf8'));
-          console.log(`已加载现有专辑数据，共 ${existingData.series.length} 个系列`);
-        }
-      } catch (error) {
-        console.warn('读取现有专辑数据失败:', error);
-        existingData = null;
-      }
+    await createDirectory(path.join(__dirname, 'data'));
+
+    let allSeriesData;
+
+    if (specificAlbumPageId) {
+      console.log(colors.magenta(`🔄 正在处理特定专辑: ${specificAlbumPageId}`));
+      allSeriesData = await getSingleAlbumDetails(specificAlbumPageId);
+    } else {
+      console.log(colors.blue('🔄 正在处理所有系列和专辑...'));
+      allSeriesData = await getAllSeriesAndAlbums();
+    }
+
+    if (!allSeriesData || allSeriesData.length === 0) {
+      console.log(colors.yellow('🤔 没有找到任何系列或专辑数据，脚本执行结束。'));
+      return;
     }
     
-    // 获取所有系列和专辑
-    const allSeries = await getAllSeriesAndAlbums();
-    console.log(`获取到 ${allSeries.length} 个系列，共 ${allSeries.reduce((acc, series) => acc + series.albums.length, 0)} 个专辑`);
-    
-    // 记录新处理的图片
-    const newProcessedImages = {...processedImages};
-    
-    // 处理每个系列下的每个专辑
-    const multibar = new cliProgress.MultiBar({
-      clearOnComplete: false,
+    const overallProgressBar = new cliProgress.MultiBar({
+      format: colors.green('{bar}') + ' | {task} | {percentage}% | {value}/{total} | {filename}',
+      barCompleteChar: '\u2588',
+      barIncompleteChar: '\u2591',
       hideCursor: true,
-      format: '{name} [{bar}] {percentage}% | {value}/{total}'
+      clearOnComplete: false,
+      stopOnComplete: true
     }, cliProgress.Presets.shades_classic);
-    
-    const seriesBar = multibar.create(allSeries.length, 0, { name: '系列进度' });
-    
-    for (let seriesIndex = 0; seriesIndex < allSeries.length; seriesIndex++) {
-      const series = allSeries[seriesIndex];
-      seriesBar.update(seriesIndex);
-      console.log(`\n处理系列 (${seriesIndex+1}/${allSeries.length}): ${series.name}`);
-      
-      // 创建系列目录
-      const seriesDir = path.join(CONFIG.baseDir, series.id);
-      await createDirectory(seriesDir);
-      
-      const albumBar = multibar.create(series.albums.length, 0, { name: '专辑进度' });
-      
-      for (let albumIndex = 0; albumIndex < series.albums.length; albumIndex++) {
-        const album = series.albums[albumIndex];
-        albumBar.update(albumIndex);
-        console.log(`\n处理专辑 (${albumIndex+1}/${series.albums.length}): ${album.title} (${album.id})`);
-        
-        // 创建专辑目录
-        const albumDir = path.join(seriesDir, album.dirName);
-        await createDirectory(albumDir);
-        
-        // 检查是否需要处理该专辑
-        const shouldProcessAlbum = needToProcessAlbum(album, existingData);
-        if (!shouldProcessAlbum && CONFIG.incrementalUpdate) {
-          console.log(`专辑 "${album.title}" 无变化，使用现有数据`);
-          
-          // 复制现有数据
-          const existingAlbum = findExistingAlbum(album.id, existingData);
-          if (existingAlbum) {
-            album.coverPath = existingAlbum.coverPath;
-            album.images = existingAlbum.images;
-            delete album.cover;
-            stats.totalSkippedAlbums++;
-            continue;
-          }
-        }
-        
-        stats.totalProcessedAlbums++;
-        
-        // 获取专辑图片
-        const albumImages = await getAlbumImages(album.id);
-        
-        // 处理封面图片
-        if (album.cover) {
-          console.log('处理封面图片...');
-          
-          // 生成封面文件名和路径
-          const coverFileName = `cover${path.extname(new URL(album.cover).pathname) || '.jpg'}`;
-          const coverPath = path.join(albumDir, coverFileName);
-          const tempCoverPath = path.join(tempDir, `temp_cover_${album.id}${path.extname(coverPath)}`);
-          
-          // 检查是否已处理过该封面
-          const coverKey = `cover:${album.id}:${album.cover}`;
-          if (processedImages[coverKey] && ((CONFIG.useOSS && await checkImageExistsInOSS(processedImages[coverKey].path)) || 
-              (!CONFIG.useOSS && fs.existsSync(coverPath))) && CONFIG.incrementalUpdate) {
-            console.log(`封面图片已处理，跳过: ${processedImages[coverKey].path}`);
-            album.coverPath = processedImages[coverKey].path;
-            if (CONFIG.useOSS && processedImages[coverKey].url) {
-              album.coverUrl = processedImages[coverKey].url;
-            }
-            stats.totalSkippedImages++;
-          } else {
-            // 处理封面图片
-            const coverResult = await processImage(album.cover, coverPath, tempCoverPath);
-            
-            if (coverResult.success) {
-              album.coverPath = coverResult.path;
-              if (CONFIG.useOSS && coverResult.url) {
-                album.coverUrl = coverResult.url;
-              }
-              stats.totalProcessedImages++;
-              
-              // 更新压缩统计
-              if (coverResult.originalSize && coverResult.compressedSize) {
-                stats.totalOriginalSize += coverResult.originalSize;
-                stats.totalCompressedSize += coverResult.compressedSize;
-              }
-              
-              // 记录已处理的封面
-              newProcessedImages[coverKey] = {
-                processedAt: new Date().toISOString(),
-                path: coverResult.path,
-                url: coverResult.url
-              };
-            }
-          }
-        } else if (albumImages.length > 0) {
-          // 如果没有封面，使用第一张图片作为封面
-          console.log('未找到封面图片，将使用第一张图片作为封面');
-        }
-        
-        // 处理所有图片
-        const processedImagesList = [];
-        const imageBar = multibar.create(albumImages.length, 0, { name: '图片进度' });
-        
-        for (let i = 0; i < albumImages.length; i++) {
-          const image = albumImages[i];
-          imageBar.update(i);
-          console.log(`处理图片 ${i + 1}/${albumImages.length}: ${image.src}`);
-          
-          // 生成安全的文件名
-          const urlObj = new URL(image.src);
-          const originalFilename = path.basename(urlObj.pathname).split('?')[0];
-          const fileExtension = path.extname(originalFilename) || '.jpg';
-          const safeFilename = `image_${i+1}${fileExtension}`;
-          
-          // 设置保存路径
-          const imagePath = path.join(albumDir, safeFilename);
-          const tempImagePath = path.join(tempDir, `temp_${album.id}_${i}${fileExtension}`);
-          
-          // 检查是否已处理过该图片
-          const imageKey = `image:${album.id}:${image.src}`;
-          if (processedImages[imageKey] && ((CONFIG.useOSS && await checkImageExistsInOSS(processedImages[imageKey].path)) || 
-              (!CONFIG.useOSS && fs.existsSync(imagePath))) && CONFIG.incrementalUpdate) {
-            console.log(`图片已处理，跳过: ${processedImages[imageKey].path}`);
-            const imageData = {
-              original_src: image.src,
-              alt: image.alt || `图片 ${i+1}`,
-              path: processedImages[imageKey].path,
-              index: i
-            };
-            
-            if (CONFIG.useOSS && processedImages[imageKey].url) {
-              imageData.url = processedImages[imageKey].url;
-            }
-            
-            processedImagesList.push(imageData);
-            stats.totalSkippedImages++;
-          } else {
-            // 处理图片
-            const processResult = await processImage(image.src, imagePath, tempImagePath);
-            
-            if (processResult.success) {
-              const imageData = {
-                original_src: image.src,
-                alt: image.alt || `图片 ${i+1}`,
-                path: processResult.path,
-                index: i
-              };
-              
-              if (CONFIG.useOSS && processResult.url) {
-                imageData.url = processResult.url;
-              }
-              
-              processedImagesList.push(imageData);
-              stats.totalProcessedImages++;
-              
-              // 更新压缩统计
-              if (processResult.originalSize && processResult.compressedSize) {
-                stats.totalOriginalSize += processResult.originalSize;
-                stats.totalCompressedSize += processResult.compressedSize;
-              }
-              
-              // 记录已处理的图片
-              newProcessedImages[imageKey] = {
-                processedAt: new Date().toISOString(),
-                path: processResult.path,
-                url: processResult.url
-              };
-            }
-          }
-          
-          // 如果这是第一张图片且没有封面，设置为封面
-          if (i === 0 && !album.coverPath && processedImagesList.length > 0) {
-            album.coverPath = processedImagesList[0].path;
-            if (CONFIG.useOSS && processedImagesList[0].url) {
-              album.coverUrl = processedImagesList[0].url;
-            }
-          }
-        }
-        
-        // 更新专辑的图片集
-        album.images = processedImagesList;
-        delete album.cover; // 移除原始封面URL
-        
-        // 完成当前专辑的处理
-        imageBar.update(albumImages.length);
-        imageBar.stop();
-        
-        // 更新专辑进度
-        albumBar.update(albumIndex + 1);
+
+    // 加载已有的 organized_albums.json 数据（如果存在）
+    let existingOrganizedData = { series: [] };
+    if (fs.existsSync(CONFIG.outputJsonPath)) {
+      try {
+        const rawData = fs.readFileSync(CONFIG.outputJsonPath, 'utf-8');
+        existingOrganizedData = JSON.parse(rawData);
+        if (!existingOrganizedData.series) existingOrganizedData.series = []; // 确保 series 数组存在
+      } catch (e) {
+        console.warn(colors.yellow('读取 organized_albums.json 文件失败，将创建一个新的: ' + e.message));
+        existingOrganizedData = { series: [] };
       }
-      
-      albumBar.stop();
-      seriesBar.update(seriesIndex + 1);
     }
-    
-    seriesBar.update(allSeries.length);
-    multibar.stop();
-    
-    // 计算总体压缩比
-    const totalCompressionRatio = stats.totalOriginalSize > 0 ? 
-      (1 - (stats.totalCompressedSize / stats.totalOriginalSize)) * 100 : 0;
-    
-    // 计算总耗时
-    const totalSeconds = Math.round((Date.now() - stats.startTime) / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    
-    // 输出总结
-    console.log('\n=== 处理完成，执行统计 ===');
-    console.log(`处理耗时: ${hours}小时 ${minutes}分钟 ${seconds}秒`);
-    console.log(`处理的专辑: ${stats.totalProcessedAlbums}，跳过的专辑: ${stats.totalSkippedAlbums}`);
-    console.log(`处理的图片: ${stats.totalProcessedImages}，跳过的图片: ${stats.totalSkippedImages}`);
-    if (CONFIG.compressImages) {
-      console.log(`总原始大小: ${filesize(stats.totalOriginalSize)}`);
-      console.log(`总压缩后大小: ${filesize(stats.totalCompressedSize)}`);
-      console.log(`总体压缩比: ${totalCompressionRatio.toFixed(2)}%`);
-      console.log(`节省空间: ${filesize(stats.totalOriginalSize - stats.totalCompressedSize)}`);
+
+    for (const series of allSeriesData) {
+      const seriesDir = path.join(CONFIG.baseDir, series.id);
+      if (!specificAlbumPageId) { // 只有在处理所有专辑时才创建系列总目录
+          await createDirectory(seriesDir);
+      }
+
+      // 在现有的 organized_albums.json 数据中查找当前系列
+      let existingSeries = existingOrganizedData.series.find(s => s.id === series.id);
+      if (!existingSeries) {
+        existingSeries = { id: series.id, name: series.name, albums: [] };
+        existingOrganizedData.series.push(existingSeries);
+      }
+
+      for (const album of series.albums) {
+        // 如果是处理单个专辑，只需要处理这个专辑
+        if (specificAlbumPageId && album.id !== specificAlbumPageId) {
+          continue;
+        }
+
+        const albumDir = path.join(seriesDir, album.dirName);
+        await createDirectory(albumDir); // 为单个专辑也创建目录，用于临时存放
+
+        const albumTask = overallProgressBar.create(album.images.length + 1, 0, { task: colors.cyan(`专辑: ${album.title}`), filename: '' });
+        
+        let processedCoverUrl = album.cover; // 默认为Notion原始URL
+        if (album.cover) {
+          albumTask.update({ filename: '处理封面...' });
+          const coverFileName = `cover-${album.id}${path.extname(album.cover.split('?')[0])}`;
+          const coverOutputPath = path.join(albumDir, coverFileName);
+          const coverTempPath = path.join(albumDir, `temp-cover-${album.id}${path.extname(album.cover.split('?')[0])}`);
+          
+          const coverResult = await processImage(album.cover, coverOutputPath, coverTempPath);
+          if (coverResult && coverResult.url) {
+            processedCoverUrl = coverResult.url;
+          }
+          albumTask.increment({ filename: '封面处理完毕' });
+        }
+        
+        album.coverUrl = processedCoverUrl; // 更新封面URL为处理后的URL
+        album.coverFocus = album.coverFocus || 'center center'; // 确保有默认值
+
+        const processedImages = [];
+        for (let i = 0; i < album.images.length; i++) {
+          const image = album.images[i];
+          albumTask.update(i + 1, { filename: image.alt || `图片 ${i+1}` });
+          
+          const originalFileName = path.basename(image.src.split('?')[0]);
+          const imageFileName = `${album.id}-image-${i}${path.extname(originalFileName)}`;
+          const imageOutputPath = path.join(albumDir, imageFileName);
+          const imageTempPath = path.join(albumDir, `temp-${album.id}-image-${i}${path.extname(originalFileName)}`);
+
+          const imageResult = await processImage(image.src, imageOutputPath, imageTempPath);
+          if (imageResult) {
+            processedImages.push({ 
+              src: imageResult.url, 
+              alt: image.alt,
+              title: image.alt, // 通常 alt 和 title 可以一样
+              type: imageResult.type,
+              size: imageResult.size,
+              width: imageResult.width,
+              height: imageResult.height
+            });
+          }
+        }
+        album.images = processedImages; // 更新为处理后的图片信息
+
+        // 在 existingSeries.albums 中查找或添加当前专辑
+        const existingAlbumIndex = existingSeries.albums.findIndex(a => a.id === album.id);
+        if (existingAlbumIndex > -1) {
+          // 更新现有专辑
+          existingSeries.albums[existingAlbumIndex] = { ...existingSeries.albums[existingAlbumIndex], ...album };
+        } else {
+          // 添加新专辑
+          existingSeries.albums.push(album);
+        }
+        overallProgressBar.update(albumTask.getTotal(), { task: colors.cyan(`专辑: ${album.title}`) + colors.green(' ✔') });
+      }
     }
-    
-    // 保存处理后的数据到 JSON 文件
-    const outputData = {
-      lastUpdate: new Date().toISOString(),
-      baseUrl: CONFIG.useOSS ? 
-        (CONFIG.ossCDNDomain ? 
-          `https://${CONFIG.ossCDNDomain}/${CONFIG.ossPrefix}` : 
-          `https://${process.env.OSS_BUCKET}.${process.env.OSS_REGION}.aliyuncs.com/${CONFIG.ossPrefix}`) : 
-        './notion_images/', // 相对于网站根目录的路径
-      series: allSeries,
-      useOSS: CONFIG.useOSS
-    };
-    
-    await fs.promises.writeFile(
-      CONFIG.outputJsonPath, 
-      JSON.stringify(outputData, null, 2)
-    );
-    
-    console.log(`数据已保存到 ${CONFIG.outputJsonPath}`);
-    
-    // 保存已处理图片记录
-    if (CONFIG.incrementalUpdate) {
-      await fs.promises.writeFile(
-        CONFIG.imageRecordPath,
-        JSON.stringify(newProcessedImages, null, 2)
-      );
-      console.log(`已处理图片记录已保存到 ${CONFIG.imageRecordPath}`);
+
+    overallProgressBar.stop();
+    fs.writeFileSync(CONFIG.outputJsonPath, JSON.stringify(existingOrganizedData, null, 2));
+    console.log(colors.green(`✅ 所有相册处理完成，数据已保存到: ${CONFIG.outputJsonPath}`));
+
+    // 清理临时目录
+    if (fs.existsSync(CONFIG.baseDir)) {
+      // fs.rmSync(CONFIG.baseDir, { recursive: true, force: true });
+      // console.log(colors.blue('🧹 已清理临时图片目录。'));
+      console.log(colors.yellow('💡 临时图片目录保留在 ' + CONFIG.baseDir + '，如果不需要可以手动删除。'));
     }
-    
-    // 尝试删除临时目录
-    try {
-      await fs.promises.rmdir(tempDir, { recursive: true });
-      console.log(`已删除临时目录 ${tempDir}`);
-    } catch (e) {
-      console.warn(`未能删除临时目录: ${e.message}`);
-    }
-    
-    console.log('=== 图片下载和组织完成 ===');
-    console.log(`所有图片已按系列和专辑保存在 ${CONFIG.baseDir} 目录下`);
-    
+
   } catch (error) {
-    console.error('程序执行失败:', error);
+    console.error(colors.red('❌ 处理过程中发生错误:'), error.message);
+    if (error.stack) {
+      console.error(error.stack);
+    }
+  } finally {
+    const endTime = Date.now();
+    const duration = (endTime - startTime) / 1000;
+    console.log(colors.cyan(`⏱️ 脚本执行完毕，总耗时: ${duration.toFixed(2)} 秒.`));
   }
 }
 
@@ -890,6 +745,72 @@ function findExistingAlbum(albumId, existingData) {
   return null;
 }
 
+// 获取特定专辑的详细信息（包括图片）
+async function getSingleAlbumDetails(albumPageId) {
+  try {
+    console.log(`开始获取特定专辑的详细信息: ${albumPageId}`);
+    const page = await notion.pages.retrieve({ page_id: albumPageId });
+
+    if (!page) {
+      throw new Error(`无法找到页面ID为 ${albumPageId} 的专辑。`);
+    }
+
+    // 从页面属性中提取系列信息
+    // 注意：这里假设"摄影集"是 select 类型，并且我们期望它只有一个值
+    const seriesProperty = page.properties.摄影集?.select;
+    const seriesName = seriesProperty?.name || '未分类';
+    const seriesId = seriesName.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+
+    // 提取专辑基本信息
+    const albumTitle = page.properties['相册']?.title[0]?.text.content || '未命名相册';
+    const albumDirName = albumTitle.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+    const location = page.properties['地点']?.rich_text[0]?.text.content || '';
+    const date = page.properties['拍摄日期']?.date?.start || '';
+    
+    // 提取封面图片URL
+    let coverUrl = '';
+    const coverProperty = page.properties['封面'];
+    if (coverProperty && coverProperty.files && coverProperty.files.length > 0) {
+      coverUrl = coverProperty.files[0].file?.url || coverProperty.files[0].external?.url || '';
+    }
+
+    // 提取我们新增的"封面焦点"属性
+    // 假设属性名叫 "封面焦点"，类型是 rich_text
+    const coverFocusProperty = page.properties['封面焦点']?.rich_text[0]?.text.content;
+    const coverFocus = coverFocusProperty || 'center center'; // 默认居中
+
+    console.log(`专辑 "${albumTitle}" 的封面焦点设置为: ${coverFocus}`);
+
+    // 获取专辑图片
+    const images = await getAlbumImages(albumPageId); // 复用现有函数
+
+    const albumData = {
+      id: albumPageId,
+      title: albumTitle,
+      dirName: albumDirName,
+      location: location,
+      date: date,
+      cover: coverUrl,
+      coverFocus: coverFocus, // 添加封面焦点信息
+      images: images
+    };
+
+    // 将单个专辑包装在系列结构中，以保持与 getAllSeriesAndAlbums 返回的数据结构一致性
+    const singleSeriesResult = [{
+      id: seriesId,
+      name: seriesName,
+      albums: [albumData]
+    }];
+
+    console.log(`成功获取特定专辑 "${albumTitle}" 的信息。`);
+    return singleSeriesResult;
+
+  } catch (error) {
+    console.error(`获取特定专辑 ${albumPageId} 详细信息失败:`, error);
+    throw error; // 重新抛出错误，以便 main 函数捕获
+  }
+}
+
 // 执行主函数
 if (require.main === module) {
   main().catch(console.error);
@@ -900,5 +821,6 @@ module.exports = {
   main,
   getAllSeriesAndAlbums,
   getAlbumImages,
-  processImage
+  processImage,
+  getSingleAlbumDetails
 }; 
